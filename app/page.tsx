@@ -245,7 +245,7 @@ export default function App() {
     try {
       if (!selectedImage) throw new Error("Görsel eksik.");
       const preProcessed = await prepareImageForOutpainting(selectedImage, aspectRatio.value);
-      const base64Data = preProcessed.split(",")[1];
+      const base64Data = preProcessed;
 
       const res = await generateProductImage(
         base64Data,
