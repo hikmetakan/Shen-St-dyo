@@ -106,7 +106,7 @@ const prepareImageForOutpainting = (
         drawW,
         drawH
       );
-      resolve(canvas.toDataURL("image/jpeg", 0.95));
+      resolve(canvas.toDataURL("image/png"));
     };
     img.src = base64Str;
   });
@@ -245,7 +245,7 @@ export default function App() {
     try {
       if (!selectedImage) throw new Error("Görsel eksik.");
       const preProcessed = await prepareImageForOutpainting(selectedImage, aspectRatio.value);
-      const base64Data = preProcessed;
+      const base64Data = preProcessed.split(",")[1];
 
       const res = await generateProductImage(
         base64Data,
