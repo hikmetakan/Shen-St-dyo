@@ -33,7 +33,7 @@ function handleError(error: any): GenerationResult {
     return { error: "İşlem durduruldu.", solution: "" };
   }
   return {
-    error: "Beklenmedik bir hata oluştu.",
+    error: `Beklenmedik bir hata oluştu: ${msg}`,
     solution: "Lütfen sayfayı yenileyip tekrar deneyin.",
   };
 }
