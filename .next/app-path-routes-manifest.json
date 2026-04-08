@@ -1,7 +1,0 @@
-{
-  "/_not-found/page": "/_not-found",
-  "/api/kieChat/route": "/api/kieChat",
-  "/api/getTaskDetail/route": "/api/getTaskDetail",
-  "/api/createTask/route": "/api/createTask",
-  "/page": "/"
-}
