@@ -1,0 +1,57 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-hardware-bg: #151619;
+  --color-hardware-card: #1C1D21;
+  --color-hardware-border: #2A2B30;
+  --color-hardware-text: #E0E0E0;
+  --color-hardware-accent: #FFD700; /* Banana Gold */
+  --color-hardware-muted: #8E9299;
+}
+
+@layer base {
+  body {
+    @apply bg-hardware-bg text-hardware-text font-sans antialiased;
+  }
+}
+
+@layer components {
+  .hardware-card {
+    @apply bg-hardware-card border border-hardware-border rounded-xl shadow-2xl;
+  }
+  
+  .hardware-input {
+    @apply bg-hardware-bg border border-hardware-border rounded-lg px-4 py-2 focus:outline-none focus:border-hardware-accent transition-colors;
+  }
+  
+  .hardware-button {
+    @apply bg-hardware-accent text-hardware-bg font-bold px-6 py-2 rounded-lg hover:opacity-90 transition-opacity active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .hardware-label {
+    @apply text-hardware-muted text-xs uppercase tracking-widest font-mono mb-1 block;
+  }
+}
+
+/* Dashed radial track for a hardware feel */
+.radial-track {
+  border: 1px dashed var(--color-hardware-muted);
+  border-radius: 50%;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-hardware-bg;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-hardware-border rounded-full hover:bg-hardware-muted transition-colors;
+}
