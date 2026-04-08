@@ -106,7 +106,7 @@ const prepareImageForOutpainting = (
         drawW,
         drawH
       );
-      resolve(canvas.toDataURL("image/png"));
+      resolve(canvas.toDataURL("image/jpeg", 0.95));
     };
     img.src = base64Str;
   });

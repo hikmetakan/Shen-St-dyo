@@ -121,7 +121,6 @@ export async function generateProductImage(
           image_input: [preProcessedImageBase64],
           aspect_ratio: aspectRatio,
           resolution,
-          output_format: "png",
         },
       }),
       signal,
