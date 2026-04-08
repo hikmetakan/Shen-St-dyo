@@ -14,12 +14,13 @@ export async function POST(request: Request) {
   try {
     console.log("Getting task detail with KIE_AI_API_KEY presence:", !!KIE_AI_API_KEY);
     const body = await request.json();
-    // Mapping to the correct endpoint as per server.ts
-    const response = await axios.post(`${KIE_AI_BASE_URL}/market/common/get-task-detail`, body, {
+    
+    // Correct external API mapping: GET /api/v1/jobs/recordInfo?taskId=...
+    const response = await axios.get(`${KIE_AI_BASE_URL}/api/v1/jobs/recordInfo`, {
+      params: { taskId: body.taskId },
       headers: {
         "Authorization": `Bearer ${KIE_AI_API_KEY}`,
-        "x-api-key": KIE_AI_API_KEY, // Supporting both common patterns
-        "Content-Type": "application/json",
+        "x-api-key": KIE_AI_API_KEY, 
       },
     });
     return NextResponse.json(response.data);

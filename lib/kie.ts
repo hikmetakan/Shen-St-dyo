@@ -154,26 +154,37 @@ export async function generateProductImage(
         throw new Error(detailData.msg || "Task detayı alınamadı.");
       }
 
-      const status = detailData.data?.status;
+      const status = detailData.data?.state || detailData.data?.status;
 
-      if (status === "success" && detailData.data?.results?.[0]?.url) {
-        const imageUrl = detailData.data.results[0].url;
-        // URL'den base64'e çevir
-        const imgRes = await fetch(imageUrl);
-        const blob = await imgRes.blob();
-        return new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            const base64 = (reader.result as string).split(",")[1];
-            resolve({ imageUrl: base64 });
-          };
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
+      if (status === "success") {
+        let imageUrl = null;
+        if (detailData.data?.resultJson) {
+          try {
+            const parsed = JSON.parse(detailData.data.resultJson);
+            imageUrl = parsed.resultUrls?.[0] || parsed.results?.[0]?.url;
+          } catch(e) {}
+        } else if (detailData.data?.results?.[0]?.url) {
+          imageUrl = detailData.data.results[0].url;
+        }
+
+        if (imageUrl) {
+          // URL'den base64'e çevir
+          const imgRes = await fetch(imageUrl);
+          const blob = await imgRes.blob();
+          return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const base64 = (reader.result as string).split(",")[1];
+              resolve({ imageUrl: base64 });
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+        }
       }
 
-      if (status === "failed") {
-        throw new Error(detailData.data?.error || "Görsel üretimi başarısız oldu.");
+      if (status === "fail" || status === "failed") {
+        throw new Error(detailData.data?.failMsg || detailData.data?.error || "Görsel üretimi başarısız oldu.");
       }
     }
 
