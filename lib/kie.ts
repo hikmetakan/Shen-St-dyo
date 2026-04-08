@@ -128,7 +128,7 @@ export async function generateProductImage(
 
     const createData = await createResponse.json();
 
-    if (createData.code !== 0 || !createData.data?.taskId) {
+    if ((createData.code !== 0 && createData.code !== 200) || !createData.data?.taskId) {
       const msg = createData.msg || "Task oluşturulamadı.";
       throw new Error(msg);
     }
@@ -150,7 +150,7 @@ export async function generateProductImage(
 
       const detailData = await detailResponse.json();
 
-      if (detailData.code !== 0) {
+      if (detailData.code !== 0 && detailData.code !== 200) {
         throw new Error(detailData.msg || "Task detayı alınamadı.");
       }
 
