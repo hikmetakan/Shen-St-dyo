@@ -168,18 +168,12 @@ export async function generateProductImage(
         }
 
         if (imageUrl) {
-          // URL'den base64'e çevir
-          const imgRes = await fetch(imageUrl);
-          const blob = await imgRes.blob();
-          return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-              const base64 = (reader.result as string).split(",")[1];
-              resolve({ imageUrl: base64 });
-            };
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-          });
+          // CORS by-pass: Vercel üzerinden görseli indir ve base64 al
+          const imgRes = await fetch(`/api/proxyImage?url=${encodeURIComponent(imageUrl)}`);
+          if (!imgRes.ok) throw new Error("Görsel proxy sunucusuna alınamadı.");
+          const proxyData = await imgRes.json();
+          if (proxyData.error) throw new Error(proxyData.error);
+          return { imageUrl: proxyData.base64 };
         }
       }
 
