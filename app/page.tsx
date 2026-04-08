@@ -24,6 +24,8 @@ import {
   X,
   CheckCircle2,
   Monitor,
+  Clock,
+  Coins,
 } from "lucide-react";
 import JSZip from "jszip";
 import {
@@ -126,6 +128,13 @@ const initDB = () =>
     req.onerror = () => reject("DB Hatası");
   });
 
+const deleteFromDB = async (id: number) => {
+  try {
+    const db = await initDB();
+    db.transaction(STORE_NAME, "readwrite").objectStore(STORE_NAME).delete(id);
+  } catch {}
+};
+
 const saveToDB = async (item: any) => {
   try {
     const db = await initDB();
@@ -199,13 +208,59 @@ export default function App() {
     src: string;
   } | null>(null);
 
+  const [remainingCredits, setRemainingCredits] = useState<number | null>(null);
+  const [generationTimes, setGenerationTimes] = useState<(number | null)[]>(Array(4).fill(null));
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  const fetchCredits = async () => {
+    try {
+      const res = await fetch("/api/getCredits");
+      const data = await res.json();
+      if (data.code === 200) setRemainingCredits(data.data);
+    } catch {}
+  };
 
   useEffect(() => {
     setIsMounted(true);
     getHistoryDB().then(setHistory);
+    fetchCredits();
+
+    // Dark Mode Fix
+    if (isDarkMode) document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
+
+    // Restore current session from localStorage
+    const saved = localStorage.getItem("shen_last_session");
+    if (saved) {
+      try {
+        const { images, prompt, selected, ratio, res } = JSON.parse(saved);
+        setGeneratedImages(images);
+        setSimplePrompt(prompt);
+        setSelectedImage(selected);
+        if (ratio) setAspectRatio(ratio);
+        if (res) setResolution(res);
+      } catch {}
+    }
   }, []);
+
+  useEffect(() => {
+    if (!isMounted) return;
+    if (isDarkMode) document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
+  }, [isDarkMode, isMounted]);
+
+  useEffect(() => {
+    if (!isMounted) return;
+    localStorage.setItem("shen_last_session", JSON.stringify({
+      images: generatedImages,
+      prompt: simplePrompt,
+      selected: selectedImage,
+      ratio: aspectRatio,
+      res: resolution
+    }));
+  }, [generatedImages, simplePrompt, selectedImage, aspectRatio, resolution, isMounted]);
 
   if (!isMounted) return <div className="h-screen bg-slate-50 dark:bg-[#0B0F1A]" />;
 
@@ -242,6 +297,7 @@ export default function App() {
     setErrorMessages((p) => { const n = [...p]; n[index] = ""; return n; });
     setErrorSolutions((p) => { const n = [...p]; n[index] = ""; return n; });
 
+    const startTime = Date.now();
     try {
       if (!selectedImage) throw new Error("Görsel eksik.");
       const preProcessed = await prepareImageForOutpainting(selectedImage, aspectRatio.value);
@@ -262,6 +318,10 @@ export default function App() {
       }
       if (res.imageUrl) {
         setGeneratedImages((p) => { const n = [...p]; n[index] = res.imageUrl!; return n; });
+        const endTime = Date.now();
+        const duration = Math.round((endTime - startTime) / 1000);
+        setGenerationTimes((p) => { const n = [...p]; n[index] = duration; return n; });
+        fetchCredits(); // Refresh credits after usage
       }
     } catch (err: any) {
       setErrorMessages((p) => {
@@ -287,9 +347,14 @@ export default function App() {
     if (abortControllerRef.current) abortControllerRef.current.abort();
     abortControllerRef.current = new AbortController();
 
-    const newHistory = { id: Date.now(), image: selectedImage, prompt: simplePrompt };
+    const newHistory = { 
+      id: Date.now(), 
+      image: selectedImage, 
+      prompt: simplePrompt,
+      generatedImages: [...generatedImages], // Mevcut görselleri de kaydet
+    };
     saveToDB(newHistory);
-    setHistory((prev) => [newHistory, ...prev].slice(0, 12));
+    setHistory((prev) => [newHistory, ...prev].slice(0, 50)); // Daha fazla arşiv tut
 
     await generateVariation(nextIndex, abortControllerRef.current.signal);
   };
@@ -387,6 +452,14 @@ export default function App() {
           </h1>
         </div>
         <div className="flex items-center gap-4">
+          {remainingCredits !== null && (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-xl">
+              <Coins className="w-4 h-4 text-amber-500" />
+              <span className="text-xs font-black text-amber-600 dark:text-amber-300">
+                {remainingCredits} KREDİ
+              </span>
+            </div>
+          )}
           <a
             href="#"
             className="hidden sm:flex bg-slate-100 dark:bg-[#1F2937] px-4 py-2 rounded-xl text-xs font-bold dark:text-white items-center gap-2 hover:bg-[#EAB308] hover:text-white transition-all"
@@ -623,7 +696,7 @@ export default function App() {
                             >
                               <span className="text-sm">{r.label}</span>
                               <span className="text-[9px] opacity-70 font-normal">
-                                {r.desc}
+                                {r.label === "1K" ? "(8 Kredi)" : r.label === "2K" ? "(12 Kredi)" : "(18 Kredi)"}
                               </span>
                             </button>
                           ))}
@@ -814,6 +887,12 @@ export default function App() {
                               <span className="text-white text-[10px] font-black tracking-widest uppercase">
                                 GÖRSELİ KAYDET
                               </span>
+                              {generationTimes[i] && (
+                                <div className="flex items-center gap-1.5 text-amber-300 text-[10px] font-bold">
+                                  <Clock className="w-3 h-3" />
+                                  {generationTimes[i]} SN
+                                </div>
+                              )}
                             </div>
                           </>
                         ) : (
@@ -835,17 +914,34 @@ export default function App() {
                         {history.map((item) => (
                           <div
                             key={item.id}
-                            onClick={() => {
-                              setSelectedImage(item.image);
-                              setSimplePrompt(item.prompt);
-                            }}
-                            className="flex-shrink-0 w-28 h-28 rounded-[1.5rem] border border-slate-200 dark:border-[#1F2937] overflow-hidden cursor-pointer hover:border-amber-400 transition-all shadow-sm opacity-60 hover:opacity-100"
+                            className="group relative flex-shrink-0"
                           >
-                            <img
-                              src={item.image}
-                              className="w-full h-full object-cover"
-                              alt="Past"
-                            />
+                            <div
+                              onClick={() => {
+                                setSelectedImage(item.image);
+                                setSimplePrompt(item.prompt || "");
+                                if (item.generatedImages) {
+                                  setGeneratedImages(item.generatedImages);
+                                }
+                              }}
+                              className="w-28 h-28 rounded-[1.5rem] border border-slate-200 dark:border-[#1F2937] overflow-hidden cursor-pointer hover:border-amber-400 transition-all shadow-sm opacity-80 hover:opacity-100"
+                            >
+                              <img
+                                src={item.image}
+                                className="w-full h-full object-cover"
+                                alt="Past"
+                              />
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteFromDB(item.id);
+                                getHistoryDB().then(setHistory);
+                              }}
+                              className="absolute -top-2 -right-2 bg-red-500 text-white p-1.5 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:scale-110 active:scale-95"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
                           </div>
                         ))}
                       </div>
