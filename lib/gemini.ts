@@ -40,10 +40,10 @@ function handleError(error: any): GenerationResult {
     type = 'safety';
     message = "Güvenlik filtresi engeli.";
     solution = "Görsel veya metin içeriği güvenlik politikalarına takıldı. Lütfen daha uygun bir açıklama veya farklı bir görsel deneyin.";
-  } else if (lowerError.includes('api key') || lowerError.includes('unauthorized') || lowerError.includes('invalid')) {
+  } else if (lowerError.includes('api key') || lowerError.includes('unauthorized') || lowerError.includes('invalid') || lowerError.includes('401')) {
     type = 'invalid-key';
     message = "API anahtarı hatası.";
-    solution = "API anahtarı geçersiz veya yetkisiz. Lütfen sistem ayarlarını kontrol edin.";
+    solution = "API anahtarı geçersiz veya yetkisiz. Lütfen Vercel/Sistem ayarlarından KIE_AI_API_KEY ve NEXT_PUBLIC_GEMINI_API_KEY değişkenlerini kontrol edin.";
   } else if (lowerError.includes('fetch') || lowerError.includes('network') || lowerError.includes('failed to fetch')) {
     type = 'network';
     message = "Ağ bağlantısı hatası.";
@@ -142,50 +142,83 @@ export async function generateProductImage(
   signal?: AbortSignal
 ): Promise<GenerationResult> {
   try {
-    const apiCall = async () => {
-      const technicalPrompt = `
-TASK: You are an elite retoucher. Your job is to seamlessly integrate the main object from the provided image into a new environment.
-CRITICAL RULE: DO NOT CHANGE THE CENTRAL OBJECT. Preserve its shape, logos, text, texture, and colors exactly as they appear. 
-Only replace the blurry or semi-transparent background areas.
-
-INTEGRATION: Place this object realistically in the environment described, ensuring it fits naturally with the surroundings.
-
-NEW SCENE DESCRIPTION: ${enhancedPrompt}
-
-STYLE: Photorealistic, 8k, award-winning commercial photography, hyper-detailed, sharp focus.
-VARIATION SEED: ${Math.floor(Math.random() * 10000)}
-`;
-
-      const response = await getAI().models.generateContent({
-        model: "gemini-2.5-flash-image",
-        contents: {
-          parts: [
-            { inlineData: { data: preProcessedImageBase64, mimeType: 'image/jpeg' } },
-            { text: technicalPrompt }
-          ]
-        },
-        config: {
-          imageConfig: {
-            aspectRatio: aspectRatio as any
-          }
+    // Kie AI Task Creation
+    const createResponse = await fetch("/api/createTask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "nano-banana-2",
+        input: {
+          prompt: enhancedPrompt,
+          image_input: [preProcessedImageBase64],
+          aspect_ratio: aspectRatio
         }
+      }),
+      signal
+    });
+
+    const createData = await createResponse.json();
+    
+    if (createData.code !== 0 || !createData.data?.taskId) {
+      console.error("Kie AI Create Error:", createData);
+      if (createData.code === 401 || createData.msg?.toLowerCase().includes("unauthorized")) {
+        return {
+          error: "Kie AI API Anahtarı Hatası",
+          solution: "Vercel ayarlarından KIE_AI_API_KEY'in doğru girildiğinden emin olun.",
+          type: 'invalid-key'
+        };
+      }
+      throw new Error(createData.msg || "Task oluşturulamadı.");
+    }
+
+    const taskId = createData.data.taskId;
+
+    // Polling for result
+    let attempts = 0;
+    const maxAttempts = 60; // 2 minutes max
+    
+    while (attempts < maxAttempts) {
+      if (signal?.aborted) throw new DOMException("İptal edildi", "AbortError");
+      
+      const detailResponse = await fetch("/api/getTaskDetail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId }),
+        signal
       });
 
-      const candidate = response.candidates?.[0];
-      if (candidate?.finishReason === 'SAFETY') {
-        throw new Error("SAFETY: Görsel üretimi güvenlik filtresine takıldı.");
+      const detailData = await detailResponse.json();
+
+      if (detailData.code !== 0) {
+        throw new Error(detailData.msg || "Task detayı alınamadı.");
       }
 
-      for (const part of candidate?.content?.parts || []) {
-        if (part.inlineData) {
-          return part.inlineData.data;
-        }
+      const status = detailData.data?.status;
+      
+      if (status === "success" && detailData.data?.results?.[0]?.url) {
+        const imageRes = await fetch(detailData.data.results[0].url);
+        const blob = await imageRes.blob();
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const base64 = (reader.result as string).split(',')[1];
+            resolve({ imageUrl: base64 });
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
       }
-      throw new Error("Görsel verisi alınamadı.");
-    };
 
-    const base64 = await fetchWithRetry(apiCall, signal);
-    return { imageUrl: base64 }; 
+      if (status === "failed") {
+        throw new Error(detailData.data?.error || "Görsel üretimi başarısız oldu.");
+      }
+
+      // Wait 2 seconds before next poll
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      attempts++;
+    }
+
+    throw new Error("İşlem zaman aşımına uğradı.");
   } catch (error) {
     return handleError(error);
   }

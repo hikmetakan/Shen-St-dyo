@@ -155,6 +155,7 @@ export default function App() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [history, setHistory] = useState<any[]>([]);
   const [fullScreenImage, setFullScreenImage] = useState<{ index: number, src: string } | null>(null);
+  const [showApiStatus, setShowApiStatus] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -353,8 +354,8 @@ export default function App() {
   };
 
   return (
-    <div className={`${isDarkMode ? 'dark' : ''} h-screen bg-slate-50 dark:bg-[#0B0F1A] flex flex-col font-sans overflow-hidden transition-colors duration-500`}>
-      <header className="px-6 py-4 bg-white dark:bg-[#111827] border-b border-slate-200 dark:border-[#1F2937] flex justify-between items-center z-20 shadow-sm">
+    <div className={`${isDarkMode ? 'dark' : ''} min-h-screen bg-slate-50 dark:bg-[#0B0F1A] flex flex-col font-sans transition-colors duration-500`}>
+      <header className="px-6 py-4 bg-white dark:bg-[#111827] border-b border-slate-200 dark:border-[#1F2937] flex justify-between items-center z-20 shadow-sm sticky top-0">
         <div className="flex items-center gap-3">
           <div className="bg-amber-500 p-2.5 rounded-2xl shadow-lg shadow-amber-400/20">
             <Sparkles className="w-6 h-6 text-white" />
@@ -365,7 +366,14 @@ export default function App() {
         </div>
 
         <div className="flex items-center gap-4">
-          <a href="#" className="bg-slate-100 dark:bg-[#1F2937] px-4 py-2 rounded-xl text-xs font-bold dark:text-white flex items-center gap-2 hover:bg-[#EAB308] hover:text-white transition-all">
+          <button 
+            onClick={() => setShowApiStatus(!showApiStatus)}
+            className="p-2.5 bg-slate-100 dark:bg-[#1F2937] rounded-xl text-slate-500 hover:text-amber-500 transition-colors"
+            title="Sistem Durumu"
+          >
+            <AlertCircle className="w-5 h-5" />
+          </button>
+          <a href="#" className="hidden sm:flex bg-slate-100 dark:bg-[#1F2937] px-4 py-2 rounded-xl text-xs font-bold dark:text-white items-center gap-2 hover:bg-[#EAB308] hover:text-white transition-all">
             <Instagram className="w-4 h-4" /> @shenajans
           </a>
           <button type="button" onClick={() => setIsDarkMode(!isDarkMode)} className="p-2.5 bg-slate-100 dark:bg-[#1F2937] rounded-xl">
@@ -374,7 +382,28 @@ export default function App() {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
+      {showApiStatus && (
+        <div className="bg-amber-50 dark:bg-amber-950/30 border-b border-amber-100 dark:border-amber-900/30 p-4">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div className="flex items-center gap-4 text-xs font-bold">
+              <span className="text-slate-500 uppercase tracking-widest">Vercel Yapılandırma Kontrolü:</span>
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${process.env.NEXT_PUBLIC_GEMINI_API_KEY ? 'bg-green-500' : 'bg-red-500'}`} />
+                <span className={process.env.NEXT_PUBLIC_GEMINI_API_KEY ? 'text-green-600' : 'text-red-600'}>Gemini API</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-blue-500" />
+                <span className="text-blue-600">Kie AI (Sunucu Taraflı)</span>
+              </div>
+            </div>
+            <p className="text-[10px] text-slate-500 italic text-center sm:text-right">
+              Not: Kie AI anahtarı güvenlik nedeniyle burada görünmez. Hata alıyorsanız Vercel panelinden KIE_AI_API_KEY'i kontrol edin.
+            </p>
+          </div>
+        </div>
+      )}
+
+      <main className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         {activeTab === null ? (
           <div className="flex-1 flex items-center justify-center p-4 lg:p-6">
             <div className="max-w-3xl w-full grid grid-cols-1 md:grid-cols-2 gap-6">
