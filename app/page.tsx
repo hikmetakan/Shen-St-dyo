@@ -80,7 +80,7 @@ export default function LandingPage() {
           transition={{ duration: 0.8, delay: 0.2 }}
           className="text-5xl md:text-7xl lg:text-8xl font-black tracking-tight uppercase leading-[0.9] mb-8"
         >
-          Ürünlerinizi <br />
+          ÜRÜNLERİNİZİ <br />
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-amber-200 to-amber-500">
             Sanata Dönüştürün.
           </span>
@@ -129,6 +129,38 @@ export default function LandingPage() {
             delay={0.2}
           />
         </motion.div>
+
+        {/* FAQ SECTION */}
+        <motion.section 
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.8 }}
+          className="w-full max-w-4xl mt-32 space-y-12"
+        >
+          <div className="text-center space-y-4">
+            <h2 className="text-4xl font-black uppercase tracking-tight">Sıkça Sorulan Sorular</h2>
+            <div className="h-1 w-20 bg-amber-500 mx-auto rounded-full" />
+          </div>
+
+          <div className="grid gap-4">
+            <FAQItem 
+              question="Shen Stüdyo nasıl çalışır?" 
+              answer="Shen Stüdyo, yüklediğiniz ürün görsellerini gelişmiş yapay zeka modelleri ile analiz eder ve vizyonunuza uygun, profesyonel stüdyo kalitesinde görseller üretir." 
+            />
+            <FAQItem 
+              question="Ürettiğim görsellerin kullanım hakları bana mı ait?" 
+              answer="Evet, Shen Stüdyo üzerinden ürettiğiniz tüm görsellerin kullanım ve ticari hakları tamamen size aittir." 
+            />
+            <FAQItem 
+              question="Her ürün için uygun mudur?" 
+              answer="Kozmetik, teknoloji, tekstil, mobilya ve daha birçok kategori için optimize edilmiştir. Ürününüzün net bir görseli olması yeterlidir." 
+            />
+            <FAQItem 
+              question="Kredi sistemi nasıl işliyor?" 
+              answer="Her görsel üretimi ve düzenleme işlemi belirli bir kredi karşılığında gerçekleştirilir. 1K çözünürlük 1 kredi, 2K 2 kredi ve 4K 4 kredi olarak ücretlendirilir." 
+            />
+          </div>
+        </motion.section>
       </main>
 
       {/* FOOTER - CLEAN VERSION */}
@@ -139,15 +171,38 @@ export default function LandingPage() {
             <span className="text-sm font-black tracking-tighter uppercase">SHEN STÜDYO</span>
           </div>
           <div className="flex gap-8 text-[10px] font-black uppercase tracking-widest text-slate-500">
-            <a href="#" className="hover:text-amber-500 transition-colors">KVKK</a>
-            <a href="#" className="hover:text-amber-500 transition-colors">ŞARTLAR</a>
-            <a href="#" className="hover:text-amber-500 transition-colors">İLETİŞİM</a>
+            <Link href="/kvkk" className="hover:text-amber-500 transition-colors">KVKK</Link>
+            <Link href="/sartlar" className="hover:text-amber-500 transition-colors">ŞARTLAR</Link>
+            <Link href="/iletisim" className="hover:text-amber-500 transition-colors">İLETİŞİM</Link>
           </div>
           <div className="text-[10px] font-black uppercase tracking-widest text-slate-600">
-            © 2024 SHEN AJANS. TÜM HAKLARI SAKLIDIR.
+            © 2026 SHEN AJANS. TÜM HAKLARI SAKLIDIR.
           </div>
         </div>
       </footer>
+    </div>
+  );
+}
+
+function FAQItem({ question, answer }: { question: string, answer: string }) {
+  const [isOpen, setIsOpen] = React.useState(false);
+  
+  return (
+    <div className="bg-slate-900/40 border border-slate-800/50 rounded-2xl overflow-hidden transition-all hover:border-amber-500/30">
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full p-6 text-left flex justify-between items-center gap-4"
+      >
+        <span className="text-sm font-black uppercase tracking-tight text-white">{question}</span>
+        <span className={`text-amber-500 transition-transform duration-300 ${isOpen ? "rotate-45" : ""}`}>
+          <Sparkles className="w-4 h-4" />
+        </span>
+      </button>
+      <div className={`overflow-hidden transition-all duration-300 ${isOpen ? "max-h-40 opacity-100" : "max-h-0 opacity-0"}`}>
+        <p className="p-6 pt-0 text-slate-400 text-xs font-medium leading-relaxed border-t border-slate-800/30">
+          {answer}
+        </p>
+      </div>
     </div>
   );
 }

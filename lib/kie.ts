@@ -196,40 +196,51 @@ export async function generateProductDescription(
   base64Image: string | null,
   mimeType: string,
   productDetails: string,
+  brand: "shen" | "ssa" = "shen",
   signal?: AbortSignal
 ): Promise<GenerationResult> {
   try {
-    const systemPrompt = `Görevin: SSA (Safety Solutions For All) markası için çalışan profesyonel bir metin yazarı olarak, ${
+    const brandConfig = brand === "ssa" 
+      ? {
+          name: "SSA (Safety Solutions For All)",
+          voice: "profesyonel, güven veren, teknik detayları kullanıcının konfor/koruma faydasıyla birleştiren bir dil",
+        }
+      : {
+          name: "Shen Stüdyo",
+          voice: "modern, yaratıcı, yapay zeka odaklı, estetik ve profesyonel fotoğrafçılık vurgulayan bir dil",
+        };
+
+    const systemPrompt = `Görevin: ${brandConfig.name} markası için çalışan profesyonel bir metin yazarı olarak, ${
       base64Image ? "yüklenen ürün görselini analiz ederek ve " : ""
     }verilen detaylara dayanarak dikkat çekici bir ürün açıklaması yazmak.
-
-ÜRÜN/MÜŞTERİ DETAYLARI: ${productDetails || "Belirtilmedi"}
-
-MARKA DİLİ VE ÖRNEKLER:
-Marka dili profesyonel, güven veren, teknik detayları kullanıcının konfor/koruma faydasıyla birleştiren bir dildir.
-
-TALİMATLAR VE ÇIKTI FORMATI:
-Her zaman EXACTLY (tam olarak) şu formatta Türkçe çıktı vermelisin:
-
-**Spot Başlıklar**
-1. [Spot Başlık 1]
-2. [Spot Başlık 2]
-3. [Spot Başlık 3]
-4. [Spot Başlık 4]
-5. [Spot Başlık 5]
-
-**Alt Başlıklar**
-1. [Alt Başlık 1 - Ürünü detaylıca tanıtan, faydasını anlatan uzun bir cümle]
-2. [Alt Başlık 2]
-3. [Alt Başlık 3]
-4. [Alt Başlık 4]
-5. [Alt Başlık 5]
-
-**Instagram Açıklamaları**
-1. [Instagram Açıklaması 1 - Emojili ve hashtagli]
-2. [Instagram Açıklaması 2 - Emojili ve hashtagli]
-
-Ekstra sohbet veya giriş/çıkış cümleleri kullanma, sadece istenen formatı ver.`;
+ 
+ ÜRÜN/MÜŞTERİ DETAYLARI: ${productDetails || "Belirtilmedi"}
+ 
+ MARKA DİLİ VE ÖRNEKLER:
+ Marka dili ${brandConfig.voice}.
+ 
+ TALİMATLAR VE ÇIKTI FORMATI:
+ Her zaman EXACTLY (tam olarak) şu formatta Türkçe çıktı vermelisin:
+ 
+ **Spot Başlıklar**
+ 1. [Spot Başlık 1]
+ 2. [Spot Başlık 2]
+ 3. [Spot Başlık 3]
+ 4. [Spot Başlık 4]
+ 5. [Spot Başlık 5]
+ 
+ **Alt Başlıklar**
+ 1. [Alt Başlık 1 - Ürünü detaylıca tanıtan, faydasını anlatan uzun bir cümle]
+ 2. [Alt Başlık 2]
+ 3. [Alt Başlık 3]
+ 4. [Alt Başlık 4]
+ 5. [Alt Başlık 5]
+ 
+ **Instagram Açıklamaları**
+ 1. [Instagram Açıklaması 1 - Emojili ve hashtagli]
+ 2. [Instagram Açıklaması 2 - Emojili ve hashtagli]
+ 
+ Ekstra sohbet veya giriş/çıkış cümleleri kullanma, sadece istenen formatı ver.`;
 
     const userContent: any[] = [{ type: "text", text: systemPrompt }];
 
