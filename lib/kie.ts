@@ -196,7 +196,7 @@ export async function generateProductDescription(
   base64Image: string | null,
   mimeType: string,
   productDetails: string,
-  brand: "shen" | "ssa" = "shen",
+  brand: "shen" | "ssa" | "gulser" = "shen",
   signal?: AbortSignal
 ): Promise<GenerationResult> {
   try {
@@ -204,6 +204,11 @@ export async function generateProductDescription(
       ? {
           name: "SSA (Safety Solutions For All)",
           voice: "profesyonel, güven veren, teknik detayları kullanıcının konfor/koruma faydasıyla birleştiren bir dil",
+        }
+      : brand === "gulser"
+      ? {
+          name: "Gülser Fabrics",
+          voice: "lüks, moda odaklı, kumaş kalitesini ve tasarım detaylarını ön plana çıkaran, sofistike ve etkileyici bir moda dili",
         }
       : {
           name: "Shen Stüdyo",
@@ -214,33 +219,33 @@ export async function generateProductDescription(
       base64Image ? "yüklenen ürün görselini analiz ederek ve " : ""
     }verilen detaylara dayanarak dikkat çekici bir ürün açıklaması yazmak.
  
- ÜRÜN/MÜŞTERİ DETAYLARI: ${productDetails || "Belirtilmedi"}
- 
- MARKA DİLİ VE ÖRNEKLER:
- Marka dili ${brandConfig.voice}.
- 
- TALİMATLAR VE ÇIKTI FORMATI:
- Her zaman EXACTLY (tam olarak) şu formatta Türkçe çıktı vermelisin:
- 
- **Spot Başlıklar**
- 1. [Spot Başlık 1]
- 2. [Spot Başlık 2]
- 3. [Spot Başlık 3]
- 4. [Spot Başlık 4]
- 5. [Spot Başlık 5]
- 
- **Alt Başlıklar**
- 1. [Alt Başlık 1 - Ürünü detaylıca tanıtan, faydasını anlatan uzun bir cümle]
- 2. [Alt Başlık 2]
- 3. [Alt Başlık 3]
- 4. [Alt Başlık 4]
- 5. [Alt Başlık 5]
- 
- **Instagram Açıklamaları**
- 1. [Instagram Açıklaması 1 - Emojili ve hashtagli]
- 2. [Instagram Açıklaması 2 - Emojili ve hashtagli]
- 
- Ekstra sohbet veya giriş/çıkış cümleleri kullanma, sadece istenen formatı ver.`;
+  ÜRÜN/MÜŞTERİ DETAYLARI: ${productDetails || "Belirtilmedi"}
+  
+  MARKA DİLİ VE ÖRNEKLER:
+  Marka dili ${brandConfig.voice}. ${brand === "gulser" ? "Kumaşın dokusu, dökümü ve moda dünyasındaki trendlerle uyumuna vurgu yap." : ""}
+  
+  TALİMATLAR VE ÇIKTI FORMATI:
+  Her zaman EXACTLY (tam olarak) şu formatta Türkçe çıktı vermelisin:
+  
+  **Spot Başlıklar**
+  1. [Spot Başlık 1]
+  2. [Spot Başlık 2]
+  3. [Spot Başlık 3]
+  4. [Spot Başlık 4]
+  5. [Spot Başlık 5]
+  
+  **Alt Başlıklar**
+  1. [Alt Başlık 1 - Ürünü detaylıca tanıtan, faydasını anlatan uzun bir cümle]
+  2. [Alt Başlık 2]
+  3. [Alt Başlık 3]
+  4. [Alt Başlık 4]
+  5. [Alt Başlık 5]
+  
+  **Instagram Açıklamaları**
+  1. [Instagram Açıklaması 1 - Emojili ve hashtagli]
+  2. [Instagram Açıklaması 2 - Emojili ve hashtagli]
+  
+  Ekstra sohbet veya giriş/çıkış cümleleri kullanma, sadece istenen formatı ver.`;
 
     const userContent: any[] = [{ type: "text", text: systemPrompt }];
 
@@ -278,6 +283,89 @@ export async function generateProductDescription(
     return handleError(error);
   }
 }
+
+// -----------------------------------------------------------------------
+// Görsel Düzenleme: Flux Image-to-Image (Kie Market API)
+// -----------------------------------------------------------------------
+export async function generateEditImage(
+  mainImageBase64: string,
+  refImageBase64: string | null,
+  prompt: string,
+  aspectRatio: string,
+  resolution: string,
+  signal?: AbortSignal
+): Promise<GenerationResult> {
+  try {
+    const images = [mainImageBase64];
+    if (refImageBase64) images.push(refImageBase64);
+
+    const createResponse = await fetch("/api/createTask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "flux-i2i", // Flux Image-to-Image model
+        input: {
+          image_input: images,
+          prompt: prompt,
+          aspect_ratio: aspectRatio,
+          resolution: resolution,
+          strength: 0.75, // Flux I2I strength default
+        },
+      }),
+      signal,
+    });
+
+    const createData = await createResponse.json();
+    if ((createData.code !== 0 && createData.code !== 200) || !createData.data?.taskId) {
+      throw new Error(createData.msg || "Düzenleme başlatılamadı.");
+    }
+
+    const taskId = createData.data.taskId;
+    const maxAttempts = 60;
+
+    for (let i = 0; i < maxAttempts; i++) {
+      if (signal?.aborted) throw new DOMException("Durduruldu", "AbortError");
+      await new Promise((r) => setTimeout(r, 3000));
+
+      const detailResponse = await fetch("/api/getTaskDetail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId }),
+        signal,
+      });
+
+      const detailData = await detailResponse.json();
+      const status = detailData.data?.state || detailData.data?.status;
+
+      if (status === "success") {
+        let imageUrl = null;
+        if (detailData.data?.resultJson) {
+          try {
+            const parsed = JSON.parse(detailData.data.resultJson);
+            imageUrl = parsed.resultUrls?.[0] || parsed.results?.[0]?.url;
+          } catch(e) {}
+        } else if (detailData.data?.results?.[0]?.url) {
+          imageUrl = detailData.data.results[0].url;
+        }
+
+        if (imageUrl) {
+          const imgRes = await fetch(`/api/proxyImage?url=${encodeURIComponent(imageUrl)}`);
+          const proxyData = await imgRes.json();
+          return { imageUrl: proxyData.base64 };
+        }
+      }
+
+      if (status === "fail" || status === "failed") {
+        throw new Error(detailData.data?.failMsg || "Düzenleme başarısız.");
+      }
+    }
+
+    throw new Error("Zaman aşımı.");
+  } catch (error: any) {
+    return handleError(error);
+  }
+}
+
 // -----------------------------------------------------------------------
 // Görsel Düzenleme Promptu: Gemini Vision logic
 // -----------------------------------------------------------------------

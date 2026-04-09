@@ -17,19 +17,15 @@ import {
   Grid,
   Video,
   SaveAll,
-  Coins,
-  ArrowLeft,
+  ArrowRight,
   X,
   CheckCircle2,
   Copy,
-  History,
   Maximize2,
-  Zap,
-  Layout,
-  Settings,
-  User,
-  LogOut,
-  ChevronRight
+  ChevronRight,
+  Eye,
+  Activity,
+  Maximize
 } from "lucide-react";
 import JSZip from "jszip";
 import {
@@ -40,6 +36,7 @@ import {
   generateEditImage
 } from "@/lib/kie";
 import { UserButton } from "@clerk/nextjs";
+import Link from "next/link";
 
 // --- SABİTLER ---
 const ASPECT_RATIOS = [
@@ -50,9 +47,9 @@ const ASPECT_RATIOS = [
 ];
 
 const RESOLUTIONS = [
-  { label: "1K", value: "1K", desc: "1 Kredi" },
-  { label: "2K", value: "2K", desc: "2 Kredi" },
-  { label: "4K", value: "4K", desc: "4 Kredi" },
+  { label: "1K", value: "1K", desc: "8 Kredi" },
+  { label: "2K", value: "2K", desc: "12 Kredi" },
+  { label: "4K", value: "4K", desc: "18 Kredi" },
 ];
 
 const DB_NAME = "ShenStudioDBv2";
@@ -105,10 +102,46 @@ const getHistoryDB = async (): Promise<any[]> => {
   }
 };
 
-const TabButton = ({ active, onClick, icon, label }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string }) => (
+// --- IMAGE COMPRESSION HELPER ---
+const compressImage = (file: File): Promise<string> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const MAX_WIDTH = 1200;
+        const MAX_HEIGHT = 1200;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", 0.8));
+      };
+    };
+  });
+};
+
+const NavTab = ({ active, onClick, icon, label }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string }) => (
   <button 
     onClick={onClick} 
-    className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all font-bold text-xs ${active ? "bg-amber-500 text-white shadow-lg shadow-amber-500/20" : "text-slate-500 hover:bg-slate-100 dark:hover:bg-[#1F2937]"}`}
+    className={`flex items-center gap-2 px-6 py-2 rounded-full transition-all font-black text-[10px] tracking-widest uppercase ${active ? "bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20" : "text-slate-400 hover:text-white hover:bg-slate-800/50"}`}
   >
     {icon} {label}
   </button>
@@ -125,7 +158,7 @@ export default function StudioPage() {
   const [resolution, setResolution] = useState(RESOLUTIONS[0]);
 
   const [productDetails, setProductDetails] = useState("");
-  const [brand, setBrand] = useState<"shen" | "ssa">("shen");
+  const [brand, setBrand] = useState<"shen" | "ssa" | "gulser">("shen");
   const [generatedDescription, setGeneratedDescription] = useState("");
   const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
@@ -140,58 +173,61 @@ export default function StudioPage() {
   const [loadingStates, setLoadingStates] = useState<boolean[]>(Array(4).fill(false));
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [history, setHistory] = useState<any[]>([]);
-  const [selectedHistoryItems, setSelectedHistoryItems] = useState<number[]>([]);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [fullScreenImage, setFullScreenImage] = useState<{ index: number; src: string } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editMainInputRef = useRef<HTMLInputElement>(null);
   const editRefInputRef = useRef<HTMLInputElement>(null);
 
-  const handleVideoTab = () => {
-    alert("Video Oluşturma özelliği çok yakında Shen Stüdyo'da!");
-  };
-
   useEffect(() => {
     setIsMounted(true);
     fetchHistory();
-    if (isDarkMode) document.documentElement.classList.add('dark');
-    else document.documentElement.classList.remove('dark');
   }, []);
-
-  useEffect(() => {
-    if (isDarkMode) document.documentElement.classList.add('dark');
-    else document.documentElement.classList.remove('dark');
-  }, [isDarkMode]);
 
   const fetchHistory = async () => {
     const data = await getHistoryDB();
     const now = Date.now();
-    
-    // Auto-delete items older than 14 days
+    // Auto-delete logic
     const oldItems = data.filter(item => (now - item.id) > FOURTEEN_DAYS_MS);
-    for (const item of oldItems) {
-      await deleteFromDB(item.id);
-    }
-    
+    for (const item of oldItems) await deleteFromDB(item.id);
     const validItems = data.filter(item => (now - item.id) <= FOURTEEN_DAYS_MS);
     setHistory(validItems);
   };
 
-  const handleImageUpload = (file: File | undefined, target: 'main' | 'editMain' | 'editRef') => {
+  const handleImageUpload = async (file: File | undefined, target: 'main' | 'editMain' | 'editRef') => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const res = reader.result as string;
-      if (target === 'main') {
-        setOriginalMimeType(file.type);
-        setSelectedImage(res);
-      } else if (target === 'editMain') {
-        setEditMainImage(res);
-      } else if (target === 'editRef') {
-        setEditRefImage(res);
-      }
-    };
-    reader.readAsDataURL(file);
+    
+    let base64;
+    if (file.size > 2 * 1024 * 1024) {
+      base64 = await compressImage(file);
+    } else {
+      base64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+    }
+
+    if (target === 'main') {
+      setOriginalMimeType(file.type);
+      setSelectedImage(base64);
+    } else if (target === 'editMain') {
+      setEditMainImage(base64);
+    } else if (target === 'editRef') {
+      setEditRefImage(base64);
+    }
+  };
+
+  const handleAnalyze = async () => {
+    if (!selectedImage) return;
+    setIsAnalyzing(true);
+    try {
+      const res = await enhanceImagePrompt(selectedImage.split(",")[1], originalMimeType, simplePrompt);
+      if (res.prompt) setSimplePrompt(res.prompt);
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const handleGenerateNext = async () => {
@@ -201,11 +237,10 @@ export default function StudioPage() {
     
     setLoadingStates((p) => { const n = [...p]; n[nextIndex] = true; return n; });
     try {
-      const res = await generateProductImage(selectedImage, simplePrompt, aspectRatio.value, resolution.value);
+      const res = await generateProductImage(selectedImage.split(",")[1], simplePrompt, aspectRatio.value, resolution.value);
       if (res.imageUrl) {
         setGeneratedImages((p) => { const n = [...p]; n[nextIndex] = res.imageUrl!; return n; });
-        const newHistory = { id: Date.now(), image: res.imageUrl, prompt: simplePrompt };
-        await saveToDB(newHistory);
+        await saveToDB({ id: Date.now(), image: res.imageUrl, prompt: simplePrompt, type: "generated" });
         fetchHistory();
       }
     } finally {
@@ -217,13 +252,23 @@ export default function StudioPage() {
     if (!editMainImage || !editPrompt) return;
     setEditLoading(true);
     try {
-      const res = await generateEditImage(editMainImage, editRefImage, editPrompt, aspectRatio.value, resolution.value);
+      const res = await generateEditImage(editMainImage.split(",")[1], editRefImage?.split(",")[1] || null, editPrompt, aspectRatio.value, resolution.value);
       if (res.imageUrl) {
         setResultImage(res.imageUrl);
-        const newHistory = { id: Date.now(), image: res.imageUrl, prompt: editPrompt };
-        await saveToDB(newHistory);
+        await saveToDB({ id: Date.now(), image: res.imageUrl, prompt: editPrompt, type: "edit" });
         fetchHistory();
       }
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const handleEnhanceEditPrompt = async () => {
+    if (!editMainImage || !editPrompt) return;
+    setEditLoading(true);
+    try {
+      const res = await enhanceEditPrompt(editMainImage.split(",")[1], editRefImage?.split(",")[1] || null, editPrompt);
+      if (res.prompt) setEditPrompt(res.prompt);
     } finally {
       setEditLoading(false);
     }
@@ -259,251 +304,269 @@ export default function StudioPage() {
     fetchHistory();
   };
 
-  const handleDeleteSelected = async () => {
-    for (const id of selectedHistoryItems) await deleteFromDB(id);
-    setSelectedHistoryItems([]);
-    fetchHistory();
-  };
-
-  const toggleHistorySelection = (id: number) => {
-    setSelectedHistoryItems(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-  };
-
   if (!isMounted) return null;
 
   return (
-    <div className={`${isDarkMode ? "dark" : ""} min-h-screen bg-slate-50 dark:bg-[#0B0F1A] flex flex-col font-sans transition-colors duration-500`}>
-      <header className="px-6 py-4 bg-white dark:bg-[#111827] border-b border-slate-200 dark:border-[#1F2937] flex justify-between items-center sticky top-0 z-50 shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="bg-amber-500 p-2.5 rounded-2xl shadow-lg shadow-amber-400/20"><Sparkles className="w-6 h-6 text-white" /></div>
-          <h1 className="text-xl font-black dark:text-white tracking-tighter uppercase">SHEN STÜDYO</h1>
+    <div className={`min-h-screen bg-[#060910] text-slate-100 flex flex-col font-sans selection:bg-amber-500/30`}>
+      {/* HEADER WITH INTEGRATED NAVBAR */}
+      <header className="px-6 py-4 bg-[#0B0F1A] border-b border-slate-800/60 flex flex-col gap-6 sticky top-0 z-50 backdrop-blur-xl bg-opacity-80">
+        <div className="flex justify-between items-center max-w-7xl mx-auto w-full">
+          <Link href="/" className="flex items-center gap-3 group">
+            <div className="bg-amber-500 p-2.5 rounded-2xl shadow-lg shadow-amber-500/20 group-hover:scale-105 transition-all"><Sparkles className="w-6 h-6 text-slate-950" /></div>
+            <h1 className="text-xl font-black tracking-tighter uppercase">SHEN STÜDYO</h1>
+          </Link>
+          <div className="flex items-center gap-4">
+            <UserButton afterSignOutUrl="/" />
+          </div>
         </div>
-        <div className="flex items-center gap-4">
-          <UserButton afterSignOutUrl="/" />
-          <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2.5 bg-slate-100 dark:bg-[#1F2937] rounded-xl">
-            {isDarkMode ? <Sun className="w-5 h-5 text-yellow-500" /> : <Moon className="w-5 h-5 text-[#EAB308]" />}
-          </button>
+
+        <div className="flex items-center justify-center gap-2 max-w-7xl mx-auto w-full overflow-x-auto no-scrollbar pb-1">
+          <NavTab active={activeTab === "generate"} onClick={() => setActiveTab("generate")} icon={<Sparkles className="w-4 h-4" />} label="GÖRSEL OLUŞTURMA" />
+          <NavTab active={activeTab === "edit"} onClick={() => setActiveTab("edit")} icon={<Edit3 className="w-4 h-4" />} label="GÖRSEL DÜZENLEME" />
+          <NavTab active={activeTab === "description"} onClick={() => setActiveTab("description")} icon={<FileText className="w-4 h-4" />} label="AÇIKLAMA ÜRET" />
+          <NavTab active={activeTab === "gallery"} onClick={() => setActiveTab("gallery")} icon={<Grid className="w-4 h-4" />} label="GALERİ" />
+          <NavTab active={activeTab === "video"} onClick={() => alert("Yakında! Video oluşturma özelliği çok yakında Shen Stüdyo'da!")} icon={<Video className="w-4 h-4" />} label="VİDEO OLUŞTURMA" />
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-        {/* SIDEBAR */}
-        <aside className="w-full lg:w-[380px] bg-white dark:bg-[#111827] border-b lg:border-r border-slate-200 dark:border-[#1F2937] flex flex-col shrink-0">
-          <div className="p-4 border-b border-slate-100 dark:border-[#1F2937] flex flex-col gap-2">
-            <TabButton active={activeTab === "generate"} onClick={() => setActiveTab("generate")} icon={<Sparkles className="w-5 h-5" />} label="GÖRSEL OLUŞTUR" />
-            <TabButton active={activeTab === "edit"} onClick={() => setActiveTab("edit")} icon={<Edit3 className="w-5 h-5" />} label="GÖRSEL DÜZENLE" />
-            <TabButton active={activeTab === "description"} onClick={() => setActiveTab("description")} icon={<FileText className="w-5 h-5" />} label="AÇIKLAMA ÜRET" />
-            <TabButton active={activeTab === "gallery"} onClick={() => setActiveTab("gallery")} icon={<Grid className="w-5 h-5" />} label="GALERİM" />
-            <TabButton active={activeTab === "video"} onClick={handleVideoTab} icon={<Video className="w-5 h-5 text-amber-500" />} label="VİDEO (YAKINDA)" />
-          </div>
-
-          <div className="flex-1 lg:overflow-y-auto p-6 space-y-8">
+      <main className="flex-1 max-w-7xl mx-auto w-full p-6 lg:p-10 flex flex-col gap-8">
+        {/* CONTROL PANEL */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+          
+          {/* LEFT: SETTINGS (4 cols) */}
+          <div className="lg:col-span-4 space-y-8 animate-in fade-in slide-in-from-left duration-700">
             {activeTab === "generate" && (
               <>
-                <section className="space-y-4">
-                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 px-1">
-                    <span className="bg-slate-100 dark:bg-[#1F2937] w-5 h-5 rounded flex items-center justify-center text-slate-500">1</span> Ürün Yükle
-                  </h3>
-                  <div onClick={() => fileInputRef.current?.click()} className={`h-48 rounded-[2.5rem] border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center ${selectedImage ? "border-amber-400 bg-amber-50/10" : "border-slate-200 dark:border-[#1F2937] dark:bg-[#0B0F1A]"}`}>
-                    {selectedImage ? <img src={selectedImage} className="h-full w-full object-contain p-4" /> : <div className="text-center opacity-40"><Upload className="w-8 h-8 mx-auto mb-2" /><p className="text-[10px] font-black uppercase">Görsel Seç</p></div>}
-                    <input type="file" ref={fileInputRef} hidden accept="image/*" onChange={(e) => handleImageUpload(e.target.files?.[0], 'main')} />
-                  </div>
-                </section>
-                <section className="space-y-4">
-                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 px-1">
-                    <span className="bg-slate-100 dark:bg-[#1F2937] w-5 h-5 rounded flex items-center justify-center text-slate-500">2</span> Kampanya Tasarımı
-                  </h3>
-                  <textarea value={simplePrompt} onChange={(e) => setSimplePrompt(e.target.value)} placeholder="Ürünü ve ortamı betimleyin..." className="w-full h-32 p-5 rounded-[2rem] bg-slate-50 dark:bg-[#0B0F1A] border border-slate-200 dark:border-[#1F2937] text-sm focus:ring-2 focus:ring-amber-400 outline-none transition-all dark:text-white" />
-                </section>
-                <section className="space-y-4 bg-slate-50 dark:bg-[#0B0F1A]/50 p-6 rounded-[2rem] border border-slate-100 dark:border-[#1F2937]">
-                   <div className="space-y-1">
-                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1"><Monitor className="w-3 h-3" /> Çözünürlük</label>
-                      <div className="flex bg-slate-100 dark:bg-slate-900/50 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800">
-                        {RESOLUTIONS.map((res) => (
-                          <button key={res.value} type="button" onClick={() => setResolution(res)} className={`flex-1 flex flex-col items-center justify-center py-2.5 rounded-xl transition-all ${resolution.value === res.value ? "bg-amber-500 text-white shadow-lg" : "text-slate-500 hover:text-slate-300"}`}>
-                            <span className="text-[10px] font-black uppercase">{res.label}</span>
-                            <span className={`text-[8px] font-bold ${resolution.value === res.value ? "text-white/70" : "text-slate-400"}`}>{res.desc}</span>
-                          </button>
-                        ))}
+                <div className="bg-[#0B0F1A] border border-slate-800/50 rounded-[2.5rem] p-8 space-y-8 shadow-2xl">
+                   <div className="space-y-4">
+                      <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2 mb-4"><Upload className="w-3 h-3 text-amber-500" /> Ürün Yükle</h3>
+                      <div onClick={() => fileInputRef.current?.click()} className={`group h-48 rounded-[2rem] border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center overflow-hidden bg-[#060910] ${selectedImage ? "border-amber-500/50" : "border-slate-800 hover:border-amber-500/30"}`}>
+                        {selectedImage ? <img src={selectedImage} className="h-full w-full object-contain p-4" /> : <div className="text-center opacity-30 group-hover:opacity-60 transition-all"><Upload className="w-10 h-10 mx-auto mb-3" /><p className="text-[9px] font-black uppercase">Görsel Seç</p></div>}
+                        <input type="file" ref={fileInputRef} hidden accept="image/*" onChange={(e) => handleImageUpload(e.target.files?.[0], 'main')} />
+                      </div>
+                      {selectedImage && (
+                        <button onClick={handleAnalyze} disabled={isAnalyzing} className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all">
+                          {isAnalyzing ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Activity className="w-3 h-3 text-amber-500" />} Ürünü Analiz Et
+                        </button>
+                      )}
+                   </div>
+
+                   <div className="space-y-4">
+                      <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2"><Sparkles className="w-3 h-3 text-amber-500" /> Betimleme</h3>
+                      <textarea value={simplePrompt} onChange={(e) => setSimplePrompt(e.target.value)} placeholder="Ürünü ve ortamı profesyonelce betimleyin..." className="w-full h-32 p-6 rounded-[2rem] bg-[#060910] border border-slate-800 focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all outline-none text-sm font-medium leading-relaxed" />
+                   </div>
+
+                   <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-3">
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1"><Maximize className="w-2.5 h-2.5" /> Çıktı Oranı</label>
+                        <select value={aspectRatio.value} onChange={(e) => setAspectRatio(ASPECT_RATIOS.find(r => r.value === e.target.value) || ASPECT_RATIOS[2])} className="w-full bg-[#060910] border border-slate-800 p-3 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none">
+                          {ASPECT_RATIOS.map(r => <option key={r.value} value={r.value}>{r.name}</option>)}
+                        </select>
+                      </div>
+                      <div className="space-y-3">
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1"><Monitor className="w-2.5 h-2.5" /> Çözünürlük</label>
+                        <select value={resolution.value} onChange={(e) => setResolution(RESOLUTIONS.find(r => r.value === e.target.value) || RESOLUTIONS[0])} className="w-full bg-[#060910] border border-slate-800 p-3 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none">
+                          {RESOLUTIONS.map(r => <option key={r.value} value={r.value}>{r.label} ({r.desc})</option>)}
+                        </select>
                       </div>
                    </div>
-                </section>
-                <button onClick={handleGenerateNext} disabled={!selectedImage || loadingStates.some(s => s)} className="w-full py-5 bg-amber-500 hover:bg-amber-600 text-white rounded-[2rem] font-black text-sm flex items-center justify-center gap-3 shadow-xl transition-all disabled:opacity-50">
-                   {loadingStates.some(s => s) ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />} YENİ VARYASYON ÜRET
-                </button>
+
+                   <button onClick={handleGenerateNext} disabled={!selectedImage || loadingStates.some(s => s)} className="w-full py-5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-[2.5rem] font-black text-xs tracking-[0.2em] flex items-center justify-center gap-3 shadow-xl shadow-amber-500/10 transition-all disabled:opacity-20 uppercase">
+                      {loadingStates.some(s => s) ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />} Varyasyon Üret
+                   </button>
+                </div>
               </>
             )}
 
             {activeTab === "edit" && (
-              <div className="space-y-6">
-                <section className="space-y-4">
-                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 px-1">
-                    <span className="bg-slate-100 dark:bg-[#1F2937] w-5 h-5 rounded flex items-center justify-center text-slate-500">1</span> Düzenlenecek Görsel
-                  </h3>
-                  <div onClick={() => editMainInputRef.current?.click()} className="h-32 rounded-[2rem] border-2 border-dashed border-slate-200 dark:border-[#1F2937] flex items-center justify-center cursor-pointer transition-all hover:border-amber-400 overflow-hidden dark:bg-[#0B0F1A]">
-                    {editMainImage ? <img src={editMainImage} className="w-full h-full object-contain p-2" /> : <div className="text-center opacity-40"><Upload className="w-6 h-6 mx-auto mb-1" /><p className="text-[9px] font-black uppercase">Ana Görsel</p></div>}
-                    <input type="file" ref={editMainInputRef} hidden accept="image/*" onChange={(e) => handleImageUpload(e.target.files?.[0], 'editMain')} />
+              <div className="bg-[#0B0F1A] border border-slate-800/50 rounded-[2.5rem] p-8 space-y-8 shadow-2xl">
+                <div className="space-y-4">
+                  <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2"><ImageIcon className="w-3 h-3 text-amber-500" /> Görsel Seçimi</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div onClick={() => editMainInputRef.current?.click()} className="h-40 rounded-3xl border-2 border-dashed border-slate-800 hover:border-amber-500/30 bg-[#060910] flex items-center justify-center cursor-pointer transition-all overflow-hidden relative group">
+                      {editMainImage ? <img src={editMainImage} className="w-full h-full object-contain p-2" /> : <div className="text-center opacity-30 group-hover:opacity-60"><Upload className="w-8 h-8 mx-auto mb-2" /><p className="text-[8px] font-black uppercase">Ana Görsel</p></div>}
+                      <input type="file" ref={editMainInputRef} hidden accept="image/*" onChange={(e) => handleImageUpload(e.target.files?.[0], 'editMain')} />
+                    </div>
+                    <div onClick={() => editRefInputRef.current?.click()} className="h-40 rounded-3xl border-2 border-dashed border-slate-800 hover:border-amber-500/30 bg-[#060910] flex items-center justify-center cursor-pointer transition-all overflow-hidden relative group">
+                      {editRefImage ? <img src={editRefImage} className="w-full h-full object-contain p-2" /> : <div className="text-center opacity-30 group-hover:opacity-60"><Upload className="w-8 h-8 mx-auto mb-2" /><p className="text-[8px] font-black uppercase">Logo/Detay</p></div>}
+                      <input type="file" ref={editRefInputRef} hidden accept="image/*" onChange={(e) => handleImageUpload(e.target.files?.[0], 'editRef')} />
+                    </div>
                   </div>
-                </section>
-                <section className="space-y-4">
-                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 px-1">
-                    <span className="bg-slate-100 dark:bg-[#1F2937] w-5 h-5 rounded flex items-center justify-center text-slate-500">2</span> Referans (Logo/Detay)
-                  </h3>
-                  <div onClick={() => editRefInputRef.current?.click()} className="h-32 rounded-[2rem] border-2 border-dashed border-slate-200 dark:border-[#1F2937] flex items-center justify-center cursor-pointer transition-all hover:border-amber-400 overflow-hidden dark:bg-[#0B0F1A]">
-                    {editRefImage ? <img src={editRefImage} className="w-full h-full object-contain p-2" /> : <div className="text-center opacity-40"><Upload className="w-6 h-6 mx-auto mb-1" /><p className="text-[9px] font-black uppercase">Logo veya Detay</p></div>}
-                    <input type="file" ref={editRefInputRef} hidden accept="image/*" onChange={(e) => handleImageUpload(e.target.files?.[0], 'editRef')} />
-                  </div>
-                </section>
-                <section className="space-y-4">
-                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">3 Değişiklik İsteği</h3>
-                  <textarea value={editPrompt} onChange={(e) => setEditPrompt(e.target.value)} placeholder="Neyi değiştirmek istersiniz? Örn: 'Arka planı plaj yap'." className="w-full h-32 p-5 rounded-[2rem] bg-slate-50 dark:bg-[#0B0F1A] border border-slate-200 dark:border-[#1F2937] text-sm focus:ring-2 focus:ring-amber-400 outline-none transition-all dark:text-white" />
-                </section>
-                <button onClick={handleApplyEdit} disabled={editLoading || !editMainImage || !editPrompt} className="w-full py-5 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded-[2rem] font-black text-sm flex items-center justify-center gap-3 shadow-xl transition-all">
-                  {editLoading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Edit3 className="w-5 h-5" />} DÜZENLEMEYİ UYGULA
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2"><Edit3 className="w-3 h-3 text-amber-500" /> Düzenleme İsteği</h3>
+                  <textarea value={editPrompt} onChange={(e) => setEditPrompt(e.target.value)} placeholder="Neyi değiştirmek istersiniz? Örn: 'Arka planı plaj ve palmiye yap'." className="w-full h-32 p-6 rounded-[2rem] bg-[#060910] border border-slate-800 focus:ring-2 focus:ring-amber-500 outline-none transition-all text-sm font-medium" />
+                  <button onClick={handleEnhanceEditPrompt} disabled={editLoading || !editMainImage || !editPrompt} className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-[10px] font-black uppercase tracking-widest rounded-xl flex items-center justify-center gap-2 transition-all">
+                    <Sparkles className="w-3 h-3 text-amber-500" /> Promptu Geliştir
+                  </button>
+                </div>
+
+                <button onClick={handleApplyEdit} disabled={editLoading || !editMainImage || !editPrompt} className="w-full py-5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-[2.5rem] font-black text-xs tracking-widest uppercase flex items-center justify-center gap-3 shadow-xl transition-all disabled:opacity-20">
+                  {editLoading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Edit3 className="w-5 h-5" />} Düzenlemeyi Uygula
                 </button>
               </div>
             )}
 
             {activeTab === "description" && (
-              <div className="space-y-6">
-                <section className="space-y-4">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2 px-1">MARKA SEÇİMİ</label>
-                  <div className="flex bg-slate-100 dark:bg-slate-900/50 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800">
-                    <button onClick={() => setBrand("shen")} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${brand === "shen" ? "bg-amber-500 text-white shadow-lg" : "text-slate-500"}`}>SHEN STÜDYO</button>
-                    <button onClick={() => setBrand("ssa")} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${brand === "ssa" ? "bg-blue-600 text-white shadow-lg" : "text-slate-500"}`}>SSA</button>
+              <div className="bg-[#0B0F1A] border border-slate-800/50 rounded-[2.5rem] p-8 space-y-8 shadow-2xl">
+                <div className="space-y-4">
+                  <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Marka Seçimi</h3>
+                  <div className="flex bg-[#060910] p-1.5 rounded-2xl border border-slate-800">
+                    <button onClick={() => setBrand("shen")} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${brand === "shen" ? "bg-amber-500 text-slate-950" : "text-slate-500"}`}>Shen Stüdyo</button>
+                    <button onClick={() => setBrand("ssa")} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${brand === "ssa" ? "bg-blue-600 text-white" : "text-slate-500"}`}>SSA</button>
+                    <button onClick={() => setBrand("gulser")} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${brand === "gulser" ? "bg-rose-600 text-white" : "text-slate-500"}`}>Gülser Fabrics</button>
                   </div>
-                </section>
-                <section className="space-y-4">
-                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Ürün Bilgileri</h3>
-                  <textarea value={productDetails} onChange={(e) => setProductDetails(e.target.value)} placeholder="Ürün özelliklerini buraya yazın..." className="w-full h-40 p-5 rounded-[2rem] bg-slate-50 dark:bg-[#0B0F1A] border border-slate-200 dark:border-[#1F2937] text-sm focus:ring-2 focus:ring-amber-400 outline-none transition-all dark:text-white" />
-                </section>
-                <button onClick={handleGenerateDescription} disabled={isGeneratingDescription} className="w-full py-5 bg-amber-500 hover:bg-amber-600 text-white rounded-[2rem] font-black text-sm flex items-center justify-center gap-3 shadow-xl disabled:opacity-50 transition-all">
-                  {isGeneratingDescription ? <RefreshCw className="w-5 h-5 animate-spin" /> : <FileText className="w-5 h-5" />} SEO METNİ ÜRET
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Ürün Özellikleri</h3>
+                  <textarea value={productDetails} onChange={(e) => setProductDetails(e.target.value)} placeholder="Ürünün kumaşı, modeli, rengi vb. detayları yazın..." className="w-full h-48 p-6 rounded-[2rem] bg-[#060910] border border-slate-800 focus:ring-2 focus:ring-amber-500 outline-none text-sm font-medium" />
+                </div>
+
+                <button onClick={handleGenerateDescription} disabled={isGeneratingDescription} className="w-full py-5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-[2.5rem] font-black text-xs tracking-widest uppercase flex items-center justify-center gap-3 transition-all">
+                  {isGeneratingDescription ? <RefreshCw className="w-5 h-5 animate-spin" /> : <FileText className="w-5 h-5" />} SEO Metni Üret
                 </button>
               </div>
             )}
-
-            {activeTab === "gallery" && (
-              <div className="space-y-6">
-                <div className="flex items-center justify-between px-1">
-                  <div className="flex items-center gap-2 text-amber-500">
-                    <AlertCircle className="w-4 h-4" />
-                    <span className="text-[9px] font-black uppercase tracking-widest">Görseller 14 gün saklanır</span>
-                  </div>
-                  {selectedHistoryItems.length > 0 && (
-                    <button onClick={handleDeleteSelected} className="text-[9px] font-black text-red-500 uppercase tracking-widest">SİL ({selectedHistoryItems.length})</button>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  {history.map(item => (
-                    <div key={item.id} className={`group relative aspect-square rounded-[1.5rem] overflow-hidden border-2 transition-all ${selectedHistoryItems.includes(item.id) ? "border-amber-500 scale-[0.98]" : "border-transparent bg-slate-50 dark:bg-[#0B0F1A]"}`}>
-                      <img src={item.image} className="w-full h-full object-cover cursor-pointer" onClick={() => toggleHistorySelection(item.id)} />
-                      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                        <button onClick={() => handleDeleteHistory(item.id)} className="p-2 bg-red-500/80 text-white rounded-lg"><Trash2 className="w-3 h-3" /></button>
-                        <a href={item.image} download={`shen-${item.id}.jpg`} className="p-2 bg-amber-500/80 text-white rounded-lg"><Download className="w-3 h-3" /></a>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
-        </aside>
 
-        {/* MAIN VIEWER */}
-        <div className="flex-1 p-8 lg:overflow-y-auto">
-          {activeTab === "generate" && (
-            <div className="max-w-7xl mx-auto space-y-8">
-              <div className="flex justify-between items-end bg-white dark:bg-[#111827] p-8 rounded-[2.5rem] border border-slate-200 dark:border-[#1F2937] shadow-xl">
-                <div className="space-y-1">
-                  <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter uppercase leading-none">STÜDYO ÇIKTILARI</h2>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{aspectRatio.name} • {resolution.label}</p>
-                </div>
-                {generatedImages.some(img => img) && (
-                   <button onClick={downloadAll} className="bg-amber-50 dark:bg-amber-900/40 text-amber-600 dark:text-amber-300 px-6 py-3 rounded-2xl flex items-center gap-2 font-black text-xs uppercase tracking-widest transition-all hover:scale-105 shadow-lg">
-                      <SaveAll className="w-4 h-4" /> TÜMÜNÜ İNDİR
-                   </button>
-                )}
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {generatedImages.map((img, i) => (
-                  <div key={i} className={`relative group rounded-[2.5rem] overflow-hidden border border-slate-100 dark:border-[#1F2937] bg-white dark:bg-[#111827] shadow-2xl transition-all hover:scale-[1.02] ${aspectRatio.class}`}>
-                    {loadingStates[i] ? (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50/90 dark:bg-[#0B0F1A]/90 backdrop-blur-md z-10">
-                        <RefreshCw className="w-10 h-10 text-amber-400 animate-spin" />
-                        <p className="mt-2 text-[10px] font-black text-amber-500 uppercase tracking-widest">Üretiliyor...</p>
+          {/* RIGHT: RESULTS (8 cols) */}
+          <div className="lg:col-span-8 flex flex-col gap-8 animate-in fade-in slide-in-from-right duration-1000">
+             {(activeTab === "generate" || activeTab === "edit") && (
+                <div className="flex-1 bg-[#0B0F1A]/30 border border-slate-800/40 rounded-[3rem] p-10 backdrop-blur-sm relative overflow-hidden">
+                   <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 blur-[120px] rounded-full pointer-events-none" />
+                   
+                   <div className="flex justify-between items-center mb-10 relative z-10">
+                      <div className="space-y-1">
+                        <h2 className="text-2xl font-black tracking-tighter uppercase leading-none">Çıktı Önizleme</h2>
+                        <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em]">{activeTab === "edit" ? "Düzenleme Modu" : (aspectRatio.name + " • " + resolution.label)}</p>
                       </div>
-                    ) : img ? (
-                      <>
-                        <img src={img} className="w-full h-full object-cover cursor-pointer" onClick={() => setFullScreenImage({ index: i, src: img })} />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center gap-3">
-                           <a href={img} download={`shen-out-${i}.jpg`} className="bg-white p-4 rounded-full shadow-2xl scale-0 group-hover:scale-100 transition-all duration-300"><Download className="w-6 h-6 text-slate-900" /></a>
+                      {generatedImages.some(img => img) && activeTab === "generate" && (
+                         <button onClick={downloadAll} className="bg-slate-800/80 hover:bg-slate-700 text-white px-6 py-3 rounded-2xl flex items-center gap-3 font-black text-[10px] uppercase tracking-widest transition-all">
+                            <SaveAll className="w-4 h-4 text-amber-500" /> Paket Olarak İndir
+                         </button>
+                      )}
+                   </div>
+
+                   {activeTab === "generate" ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
+                        {generatedImages.map((img, i) => (
+                          <div key={i} className={`relative group rounded-[2rem] overflow-hidden border border-slate-800/50 bg-[#060910]/50 shadow-2xl transition-all hover:border-amber-500/30 ${aspectRatio.class}`}>
+                            {loadingStates[i] ? (
+                              <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0B0F1A]/80 backdrop-blur-md z-11">
+                                <RefreshCw className="w-10 h-10 text-amber-500 animate-spin" />
+                                <p className="mt-4 text-[9px] font-black text-amber-500 uppercase tracking-[0.3em]">Sanata Dönüşüyor...</p>
+                              </div>
+                            ) : img ? (
+                              <>
+                                <img src={img} className="w-full h-full object-cover cursor-pointer" onClick={() => setFullScreenImage({ index: i, src: img })} />
+                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-4">
+                                   <a href={img} download={`shen-output-${i}.jpg`} className="bg-white/10 hover:bg-white/20 p-4 rounded-full backdrop-blur-md"><Download className="w-6 h-6 text-white" /></a>
+                                   <button onClick={() => setFullScreenImage({ index: i, src: img })} className="bg-white/10 hover:bg-white/20 p-4 rounded-full backdrop-blur-md"><Maximize2 className="w-6 h-6 text-white" /></button>
+                                </div>
+                              </>
+                            ) : (
+                              <div className="absolute inset-0 flex items-center justify-center opacity-[0.03]"><Sparkles className="w-32 h-32" /></div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                   ) : (
+                      <div className="flex flex-col md:flex-row gap-8 h-full min-h-[400px]">
+                        <div className="flex-1 space-y-3">
+                           <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Orijinal</p>
+                           <div className="aspect-square bg-[#060910] rounded-3xl border border-slate-800/50 overflow-hidden flex items-center justify-center p-4">
+                              {editMainImage ? <img src={editMainImage} className="w-full h-full object-contain" /> : <ImageIcon className="w-12 h-12 text-slate-800" />}
+                           </div>
                         </div>
-                      </>
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center opacity-5"><ImageIcon className="w-24 h-24" /></div>
+                        <div className="flex-1 space-y-3">
+                           <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest">Yeni Görünüm</p>
+                           <div className="aspect-square bg-[#060910] rounded-3xl border-2 border-dashed border-slate-800 flex items-center justify-center overflow-hidden relative">
+                              {editLoading && (
+                                <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center">
+                                   <RefreshCw className="w-10 h-10 text-amber-500 animate-spin" />
+                                   <p className="mt-4 text-[8px] font-black uppercase tracking-widest">Düzenleniyor...</p>
+                                </div>
+                              )}
+                              {resultImage ? <img src={resultImage} className="w-full h-full object-contain p-2" /> : <div className="text-center opacity-[0.02]"><Sparkles className="w-32 h-32" /></div>}
+                           </div>
+                        </div>
+                      </div>
+                   )}
+                </div>
+             )}
+
+             {activeTab === "description" && (
+                <div className="flex-1 bg-[#0B0F1A]/30 border border-slate-800/40 rounded-[3rem] p-10 flex flex-col gap-8 shadow-2xl">
+                  <div className="flex justify-between items-center">
+                    <h2 className="text-2xl font-black uppercase tracking-tighter">SEO İçerik Paneli</h2>
+                    {generatedDescription && (
+                      <button onClick={handleCopyDescription} className="bg-amber-500 text-slate-950 px-8 py-3 rounded-full flex items-center gap-3 font-black text-[10px] uppercase transition-all hover:scale-105 shadow-lg">
+                        {isCopied ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />} {isCopied ? "Kopyalandı" : "Panoya Kopyala"}
+                      </button>
                     )}
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {activeTab === "edit" && (
-            <div className="max-w-4xl mx-auto space-y-8">
-              <div className="bg-white dark:bg-[#111827] p-10 rounded-[3rem] border border-slate-200 dark:border-[#1F2937] shadow-2xl">
-                <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter uppercase mb-8">DÜZENLEME ÖNİZLEME</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                  <div className="space-y-4">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Orijinal Görsel</p>
-                    <div className="aspect-square bg-slate-50 dark:bg-[#0B0F1A] rounded-[2.5rem] border border-slate-100 dark:border-slate-800 flex items-center justify-center overflow-hidden">
-                      {editMainImage ? <img src={editMainImage} className="w-full h-full object-contain" /> : <ImageIcon className="w-16 h-16 text-slate-200" />}
-                    </div>
-                  </div>
-                  <div className="space-y-4">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Düzenlenmiş Sonuç</p>
-                    <div className="aspect-square bg-slate-50 dark:bg-[#0B0F1A] rounded-[2.5rem] border-2 border-dashed border-slate-200 dark:border-slate-800 flex items-center justify-center">
-                      {resultImage ? <img src={resultImage} className="w-full h-full object-contain" /> : <div className="text-center opacity-10"><Sparkles className="w-20 h-20 mx-auto" /></div>}
-                    </div>
+                  <div className="flex-1 bg-[#060910]/80 p-10 rounded-[2.5rem] border border-slate-800 shadow-inner overflow-hidden relative group">
+                    <textarea readOnly value={generatedDescription} placeholder="Üretilen metin burada profesyonel bir düzende görünecek..." className="w-full h-full bg-transparent border-none outline-none resize-none text-slate-300 text-sm font-medium leading-loose" />
+                    {!generatedDescription && <div className="absolute inset-0 flex flex-col items-center justify-center opacity-[0.03] pointer-events-none"><FileText className="w-48 h-48" /></div>}
                   </div>
                 </div>
-              </div>
-            </div>
-          )}
+             )}
 
-          {(activeTab === "description" || activeTab === "gallery") && (
-            <div className="max-w-3xl mx-auto h-full flex flex-col">
-               {activeTab === "description" ? (
-                  <div className="flex-1 bg-white dark:bg-[#111827] rounded-[3rem] border border-slate-200 dark:border-[#1F2937] shadow-2xl p-10 flex flex-col">
-                    <div className="flex justify-between items-center mb-8">
-                      <h2 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">SEO İÇERİK EDİTÖRÜ</h2>
-                      {generatedDescription && (
-                        <button onClick={handleCopyDescription} className="bg-amber-50 dark:bg-amber-900/40 text-amber-600 dark:text-amber-300 px-6 py-3 rounded-2xl flex items-center gap-3 font-black text-xs uppercase transition-all hover:scale-105">
-                          {isCopied ? <CheckCircle2 className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5" />} {isCopied ? "Kopyalandı" : "Kopyala"}
-                        </button>
-                      )}
+             {activeTab === "gallery" && (
+                <div className="flex-1 space-y-8 h-full">
+                  <div className="bg-amber-500/10 border border-amber-500/20 p-6 rounded-[2rem] flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="bg-amber-500 p-2 rounded-xl"><AlertCircle className="w-5 h-5 text-slate-950" /></div>
+                      <span className="text-xs font-black uppercase tracking-widest text-amber-500/80">Oluşturulan Görseller 14 gün sonra otomatik silinecektir.</span>
                     </div>
-                    <textarea readOnly value={generatedDescription} placeholder="Üretilen metin burada görünecek..." className="flex-1 w-full bg-slate-50 dark:bg-[#0B0F1A] border-none rounded-3xl p-8 text-sm dark:text-slate-200 outline-none resize-none font-medium leading-relaxed" />
                   </div>
-               ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center text-slate-400 opacity-20">
-                     <Grid className="w-32 h-32 mb-4" />
-                     <p className="text-xl font-black uppercase tracking-widest">Görsel seçimi yapın</p>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 pb-20">
+                    {history.map(item => (
+                      <div key={item.id} className="group relative aspect-square rounded-[2rem] overflow-hidden border border-slate-800 bg-[#0B0F1A] hover:border-amber-500/40 transition-all shadow-xl">
+                        <img src={item.image} className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center gap-3">
+                           <div className="flex gap-2">
+                              <button onClick={() => setFullScreenImage({ index: 0, src: item.image })} className="p-3 bg-white text-slate-950 rounded-xl hover:scale-110 transition-all shadow-lg"><Eye className="w-5 h-5" /></button>
+                              <a href={item.image} download={`shen-out-${item.id}.jpg`} className="p-3 bg-amber-500 text-slate-950 rounded-xl hover:scale-110 transition-all shadow-lg"><Download className="w-5 h-5" /></a>
+                           </div>
+                           <button onClick={() => handleDeleteHistory(item.id)} className="text-[10px] font-black text-red-500 uppercase tracking-widest flex items-center gap-1 hover:text-red-400 transition-colors"><Trash2 className="w-3 h-3" /> Sil</button>
+                        </div>
+                      </div>
+                    ))}
+                    {history.length === 0 && (
+                       <div className="col-span-full h-64 flex flex-col items-center justify-center opacity-10 grayscale">
+                          <Grid className="w-16 h-16 mb-4" />
+                          <p className="text-sm font-black uppercase tracking-widest">Galeri Henüz Boş</p>
+                       </div>
+                    )}
                   </div>
-               )}
-            </div>
-          )}
+                </div>
+             )}
+          </div>
         </div>
       </main>
 
+      {/* FULLSCREEN PREVIEW */}
       {fullScreenImage && (
-        <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-8 backdrop-blur-2xl">
-          <button onClick={() => setFullScreenImage(null)} className="absolute top-8 right-8 text-white p-3 hover:bg-white/10 rounded-full transition-all"><X className="w-10 h-10" /></button>
-          <img src={fullScreenImage.src} className="max-w-full max-h-full object-contain shadow-2xl rounded-2xl" />
+        <div className="fixed inset-0 z-[100] bg-black/98 flex items-center justify-center p-8 backdrop-blur-3xl animate-in fade-in duration-300">
+          <button onClick={() => setFullScreenImage(null)} className="absolute top-10 right-10 text-white p-4 hover:bg-white/10 rounded-full transition-all border border-white/10"><X className="w-8 h-8" /></button>
+          <img src={fullScreenImage.src} className="max-w-full max-h-[85vh] object-contain shadow-2xl rounded-3xl border border-white/5" />
+          <div className="absolute bottom-10 flex gap-4">
+             <a href={fullScreenImage.src} download="shen-full.jpg" className="px-10 py-5 bg-amber-500 text-slate-950 rounded-full font-black text-xs uppercase tracking-[0.2em] shadow-2xl flex items-center gap-3 hover:scale-105 transition-all"><Download className="w-5 h-5" /> Görseli İndir</a>
+          </div>
         </div>
       )}
 
-      <footer className="py-3 bg-white dark:bg-[#0B0F1A] border-t border-slate-100 dark:border-slate-900 text-[10px] text-center text-slate-400 font-black uppercase tracking-[0.4em] shrink-0">
+      <footer className="py-6 bg-[#060910] border-t border-slate-900/50 text-[10px] text-center text-slate-600 font-bold uppercase tracking-[0.5em] shrink-0 mt-auto">
+        SHEN AJANS © 2026 • TÜM HAKLARI SAKLIDIR
+      </footer>
+    </div>
+  );
+}
+case tracking-[0.4em] shrink-0">
         SHEN STÜDYO © 2026
       </footer>
     </div>

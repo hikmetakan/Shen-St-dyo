@@ -144,6 +144,10 @@ export default function LandingPage() {
 
           <div className="grid gap-4">
             <FAQItem 
+              question="Telefonla çektiğim bir ürünü stüdyoda çekilmiş gibi gösterebilir miyim?" 
+              answer="Evet, Shen Stüdyo modelimiz derinlik ve ışıklandırma analizi yaparak telefonla çekilmiş amatör fotoğrafları profesyonel stüdyo çekimi kalitesine dönüştürür." 
+            />
+            <FAQItem 
               question="Shen Stüdyo nasıl çalışır?" 
               answer="Shen Stüdyo, yüklediğiniz ürün görsellerini gelişmiş yapay zeka modelleri ile analiz eder ve vizyonunuza uygun, profesyonel stüdyo kalitesinde görseller üretir." 
             />

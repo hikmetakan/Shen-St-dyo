@@ -12,5 +12,9 @@ coverage/
 .pnp.js
 /scripts/*.js
 /scripts/*.cjs
+# Local scripts
+telegram-notify.js
+telegram-notify.cjs
+scripts/*.cjs
 .env
 .env.local
