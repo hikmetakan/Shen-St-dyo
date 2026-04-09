@@ -158,7 +158,8 @@ export default function StudioPage() {
   const [resolution, setResolution] = useState(RESOLUTIONS[0]);
 
   const [productDetails, setProductDetails] = useState("");
-  const [brand, setBrand] = useState<"shen" | "ssa" | "gulser">("shen");
+  const [brand, setBrand] = useState<"ssa" | "gulser">("ssa");
+  const [credits, setCredits] = useState<number | null>(null);
   const [generatedDescription, setGeneratedDescription] = useState("");
   const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
@@ -183,7 +184,18 @@ export default function StudioPage() {
   useEffect(() => {
     setIsMounted(true);
     fetchHistory();
+    fetchCredits();
   }, []);
+
+  const fetchCredits = async () => {
+    try {
+      const res = await fetch("/api/getCredits");
+      const data = await res.json();
+      if (data.code === 0 || data.code === 200) {
+        setCredits(data.data?.credit ?? 0);
+      }
+    } catch {}
+  };
 
   const fetchHistory = async () => {
     const data = await getHistoryDB();
@@ -242,6 +254,7 @@ export default function StudioPage() {
         setGeneratedImages((p) => { const n = [...p]; n[nextIndex] = res.imageUrl!; return n; });
         await saveToDB({ id: Date.now(), image: res.imageUrl, prompt: simplePrompt, type: "generated" });
         fetchHistory();
+        fetchCredits(); // Update balance
       }
     } finally {
       setLoadingStates((p) => { const n = [...p]; n[nextIndex] = false; return n; });
@@ -257,6 +270,7 @@ export default function StudioPage() {
         setResultImage(res.imageUrl);
         await saveToDB({ id: Date.now(), image: res.imageUrl, prompt: editPrompt, type: "edit" });
         fetchHistory();
+        fetchCredits(); // Update balance
       }
     } finally {
       setEditLoading(false);
@@ -316,6 +330,12 @@ export default function StudioPage() {
             <h1 className="text-xl font-black tracking-tighter uppercase">SHEN STÜDYO</h1>
           </Link>
           <div className="flex items-center gap-4">
+            {credits !== null && (
+              <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-slate-900 border border-slate-800 rounded-full">
+                <Activity className="w-3 h-3 text-amber-500" />
+                <span className="text-[10px] font-black tracking-widest text-slate-300 uppercase">Kredi: {credits}</span>
+              </div>
+            )}
             <UserButton afterSignOutUrl="/" />
           </div>
         </div>
@@ -413,8 +433,7 @@ export default function StudioPage() {
                 <div className="space-y-4">
                   <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Marka Seçimi</h3>
                   <div className="flex bg-[#060910] p-1.5 rounded-2xl border border-slate-800">
-                    <button onClick={() => setBrand("shen")} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${brand === "shen" ? "bg-amber-500 text-slate-950" : "text-slate-500"}`}>Shen Stüdyo</button>
-                    <button onClick={() => setBrand("ssa")} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${brand === "ssa" ? "bg-blue-600 text-white" : "text-slate-500"}`}>SSA</button>
+                    <button onClick={() => setBrand("ssa")} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${brand === "ssa" ? "bg-amber-500 text-slate-950" : "text-slate-500"}`}>SSA</button>
                     <button onClick={() => setBrand("gulser")} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${brand === "gulser" ? "bg-rose-600 text-white" : "text-slate-500"}`}>Gülser Fabrics</button>
                   </div>
                 </div>

@@ -27,12 +27,21 @@ export async function POST(request: Request) {
     if (body.input && body.input.image_input && Array.isArray(body.input.image_input)) {
       for (let i = 0; i < body.input.image_input.length; i++) {
         let imgStr = body.input.image_input[i];
-        if (imgStr && imgStr.startsWith("data:image/")) {
+        // Support both full Data URLs and raw Base64 strings
+        const isDataUrl = imgStr && imgStr.startsWith("data:image/");
+        const isPureBase64 = imgStr && !imgStr.includes(",") && imgStr.length > 100; // Heuristic for base64
+
+        if (isDataUrl || isPureBase64) {
           try {
-            const base64Data = imgStr.split(",")[1];
+            let base64Data = isDataUrl ? imgStr.split(",")[1] : imgStr;
+            let mimeType = "image/jpeg";
+            
+            if (isDataUrl) {
+              const mimeMatch = imgStr.match(/^data:(image\/\w+);base64,/);
+              if (mimeMatch) mimeType = mimeMatch[1];
+            }
+            
             const buffer = Buffer.from(base64Data, "base64");
-            const mimeMatch = imgStr.match(/^data:(image\/\w+);base64,/);
-            const mimeType = mimeMatch ? mimeMatch[1] : "image/jpeg";
             const fileExt = mimeType.split("/")[1] || "jpg";
             
             const blob = new Blob([buffer], { type: mimeType });

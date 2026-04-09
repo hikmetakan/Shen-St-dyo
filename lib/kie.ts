@@ -208,21 +208,43 @@ export async function generateProductDescription(
       : brand === "gulser"
       ? {
           name: "Gülser Fabrics",
-          voice: "lüks, moda odaklı, kumaş kalitesini ve tasarım detaylarını ön plana çıkaran, sofistike ve etkileyici bir moda dili",
+          voice: "luxury fashion brand voice, confident, minimal, editorial. No casual language.",
         }
       : {
           name: "Shen Stüdyo",
           voice: "modern, yaratıcı, yapay zeka odaklı, estetik ve profesyonel fotoğrafçılık vurgulayan bir dil",
         };
 
-    const systemPrompt = `Görevin: ${brandConfig.name} markası için çalışan profesyonel bir metin yazarı olarak, ${
+    const isGulser = brand === "gulser";
+
+    const systemPrompt = isGulser 
+      ? `GÜLSER FABRICS – AI DESCRIPTION GENERATOR PROMPT
+You are a senior textile marketing copywriter and luxury fashion brand strategist for Gülser Fabrics. 
+Your job is to transform raw fabric technical specifications into high-end, emotionally engaging, B2B luxury textile product descriptions.
+You do NOT simply describe fabrics. You position them as premium materials used by global fashion houses.
+
+INPUT: Name, Color code, Weave type, Width, Weight (gsm), Composition.
+
+OUTPUT REQUIREMENTS:
+1. Start with a powerful, short headline (2–6 words) - Must feel like fashion editorial language. No repetition of product name.
+2. Introduce the fabric name as a “hero product”.
+3. Translate technical specs into luxury language.
+4. Always include usage scenarios and design intention.
+5. Tone: Luxury fashion brand voice, confident, minimal, editorial. No casual language. No bullet point specs.
+6. Style rules: Avoid repeating adjectives. Must feel different every time.
+7. End with a short positioning line.
+8. Hashtags: Always include 4–6 relevant hashtags. Must include #GulserFabric + collection/season tag.
+
+Müşteri Detayları: ${productDetails || "Belirtilmedi"}
+Lütfen sadece bu markanın dilinde ve formatında, Türkçe yanıt ver.`
+      : `Görevin: ${brandConfig.name} markası için çalışan profesyonel bir metin yazarı olarak, ${
       base64Image ? "yüklenen ürün görselini analiz ederek ve " : ""
     }verilen detaylara dayanarak dikkat çekici bir ürün açıklaması yazmak.
  
   ÜRÜN/MÜŞTERİ DETAYLARI: ${productDetails || "Belirtilmedi"}
   
   MARKA DİLİ VE ÖRNEKLER:
-  Marka dili ${brandConfig.voice}. ${brand === "gulser" ? "Kumaşın dokusu, dökümü ve moda dünyasındaki trendlerle uyumuna vurgu yap." : ""}
+  Marka dili ${brandConfig.voice}. 
   
   TALİMATLAR VE ÇIKTI FORMATI:
   Her zaman EXACTLY (tam olarak) şu formatta Türkçe çıktı vermelisin:
