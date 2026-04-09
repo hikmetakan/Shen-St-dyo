@@ -17,18 +17,22 @@ export const metadata: Metadata = {
   description: "Yapay zeka destekli ürün stüdyosu",
 };
 
+import { ClerkProvider } from "@clerk/nextjs";
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
-      <body
-        className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}
-      >
-        {children}
-      </body>
-    </html>
+    <ClerkProvider>
+      <html lang="en" className="dark">
+        <body
+          className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}
+        >
+          {children}
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }

@@ -267,3 +267,64 @@ Ekstra sohbet veya giriş/çıkış cümleleri kullanma, sadece istenen formatı
     return handleError(error);
   }
 }
+// -----------------------------------------------------------------------
+// Görsel Düzenleme Promptu: Gemini Vision logic
+// -----------------------------------------------------------------------
+export async function enhanceEditPrompt(
+  mainImageBase64: string,
+  refImageBase64: string | null,
+  userPrompt: string,
+  signal?: AbortSignal
+): Promise<GenerationResult> {
+  try {
+    const mainDataUrl = `data:image/jpeg;base64,${mainImageBase64}`;
+    
+    const content: any[] = [
+      {
+        type: "text",
+        text: `Sen profesyonel bir yapay zeka görsel düzenleme uzmanısın. Kullanıcı sana düzenlenecek bir ana görsel, ${refImageBase64 ? "bir referans görsel" : ""} ve basit bir istek sundu. 
+Görevin, kullanıcının isteğini anlayıp, Image-to-Image inpainting yapay zeka modellerinin anlayacağı, İngilizce, detayları koruyan, yüksek kaliteli ve çok net bir 'image editing prompt' oluşturmaktır.
+
+Kullanıcının İsteği: "${userPrompt}"
+
+TALİMATLAR:
+1. Sadece İngilizce prompt üret.
+2. Teknik terimler kullan (masterpiece, high resolution, seamless integration).
+3. Ana görseldeki detayları koru.
+4. Doğrudan promptu yaz, açıklama yapma.`,
+      },
+      {
+        type: "image_url",
+        image_url: { url: mainDataUrl },
+      },
+    ];
+
+    if (refImageBase64) {
+      content.push({
+        type: "image_url",
+        image_url: { url: `data:image/jpeg;base64,${refImageBase64}` },
+      });
+    }
+
+    const response = await fetch("/api/kieChat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messages: [{ role: "user", content }],
+        stream: false,
+      }),
+      signal,
+    });
+
+    const data = await response.json();
+    if (!response.ok) throw new Error(data?.error?.message || data?.msg || `HTTP ${response.status}`);
+
+    const text = data?.choices?.[0]?.message?.content;
+    if (!text) throw new Error("Yanıt boş geldi.");
+
+    return { prompt: text };
+  } catch (error: any) {
+    if (error?.name === "AbortError") return { error: "İşlem durduruldu.", solution: "" };
+    return handleError(error);
+  }
+}
