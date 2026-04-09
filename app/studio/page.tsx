@@ -566,9 +566,3 @@ export default function StudioPage() {
     </div>
   );
 }
-case tracking-[0.4em] shrink-0">
-        SHEN STÜDYO © 2026
-      </footer>
-    </div>
-  );
-}
