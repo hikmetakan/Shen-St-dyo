@@ -149,7 +149,7 @@ const NavTab = ({ active, onClick, icon, label }: { active: boolean, onClick: ()
 
 export default function StudioPage() {
   const [isMounted, setIsMounted] = useState(false);
-  const [activeTab, setActiveTab] = useState<"generate" | "edit" | "description" | "gallery" | "video">("generate");
+  const [activeTab, setActiveTab] = useState<"generate" | "edit" | "description" | "gallery" | "video" | "gulser">("generate");
 
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [originalMimeType, setOriginalMimeType] = useState("image/png");
@@ -170,6 +170,17 @@ export default function StudioPage() {
   const [editLoading, setEditLoading] = useState(false);
   const [resultImage, setResultImage] = useState<string | null>(null);
 
+  // --- GULSER STUDYO STATES ---
+  const GULSER_REFS = [
+    "https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?auto=format&fit=crop&w=500&q=80",
+    "https://images.unsplash.com/photo-1584282855160-b6f120c156f3?auto=format&fit=crop&w=500&q=80",
+    "https://images.unsplash.com/photo-1598402484557-0104764850fa?auto=format&fit=crop&w=500&q=80"
+  ];
+  const [selectedGulserRef, setSelectedGulserRef] = useState<number>(0);
+  const [gulserFabricImage, setGulserFabricImage] = useState<string | null>(null);
+  const [isGulserLoading, setIsGulserLoading] = useState(false);
+  const [gulserResultImage, setGulserResultImage] = useState<string | null>(null);
+
   const [generatedImages, setGeneratedImages] = useState<(string | null)[]>(Array(4).fill(null));
   const [loadingStates, setLoadingStates] = useState<boolean[]>(Array(4).fill(false));
   const [isDarkMode, setIsDarkMode] = useState(true);
@@ -180,6 +191,7 @@ export default function StudioPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editMainInputRef = useRef<HTMLInputElement>(null);
   const editRefInputRef = useRef<HTMLInputElement>(null);
+  const gulserFabricInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -207,7 +219,7 @@ export default function StudioPage() {
     setHistory(validItems);
   };
 
-  const handleImageUpload = async (file: File | undefined, target: 'main' | 'editMain' | 'editRef') => {
+  const handleImageUpload = async (file: File | undefined, target: 'main' | 'editMain' | 'editRef' | 'gulserFabric') => {
     if (!file) return;
     
     let base64;
@@ -228,6 +240,8 @@ export default function StudioPage() {
       setEditMainImage(base64);
     } else if (target === 'editRef') {
       setEditRefImage(base64);
+    } else if (target === 'gulserFabric') {
+      setGulserFabricImage(base64);
     }
   };
 
@@ -301,6 +315,40 @@ export default function StudioPage() {
     setTimeout(() => setIsCopied(false), 2000);
   };
 
+  const handleGulserGenerate = async () => {
+    if (!gulserFabricImage) return;
+    setIsGulserLoading(true);
+    setGulserResultImage(null);
+    try {
+      const res = await fetch("/api/wiro", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          images: [GULSER_REFS[selectedGulserRef], gulserFabricImage]
+        })
+      });
+      const data = await res.json();
+      
+      if (data.code === 200 && data.data?.imageUrl) {
+        // Wiro'dan gelen görseli CORS proxy üzerinden alıp gösteriyoruz
+        const imgRes = await fetch(`/api/proxyImage?url=${encodeURIComponent(data.data.imageUrl)}`);
+        const proxyData = await imgRes.json();
+        if (proxyData.base64) {
+          setGulserResultImage(proxyData.base64);
+          await saveToDB({ id: Date.now(), image: proxyData.base64, prompt: "Gülser Kumaş Hareketi Aktarımı", type: "gulser" });
+          fetchHistory();
+          fetchCredits();
+        }
+      } else {
+        alert("Wiro API Hatası: " + (data.msg || "Bilinmeyen hata"));
+      }
+    } catch (e: any) {
+      alert("Bir hata oluştu: " + e.message);
+    } finally {
+      setIsGulserLoading(false);
+    }
+  };
+
   const downloadAll = async () => {
     const zip = new JSZip();
     generatedImages.forEach((img, i) => {
@@ -344,6 +392,7 @@ export default function StudioPage() {
           <NavTab active={activeTab === "generate"} onClick={() => setActiveTab("generate")} icon={<Sparkles className="w-4 h-4" />} label="GÖRSEL OLUŞTURMA" />
           <NavTab active={activeTab === "edit"} onClick={() => setActiveTab("edit")} icon={<Edit3 className="w-4 h-4" />} label="GÖRSEL DÜZENLEME" />
           <NavTab active={activeTab === "description"} onClick={() => setActiveTab("description")} icon={<FileText className="w-4 h-4" />} label="AÇIKLAMA ÜRET" />
+          <NavTab active={activeTab === "gulser"} onClick={() => setActiveTab("gulser")} icon={<Sun className="w-4 h-4" />} label="GÜLSER STÜDYO" />
           <NavTab active={activeTab === "gallery"} onClick={() => setActiveTab("gallery")} icon={<Grid className="w-4 h-4" />} label="GALERİ" />
           <NavTab active={activeTab === "video"} onClick={() => alert("Yakında! Video oluşturma özelliği çok yakında Shen Stüdyo'da!")} icon={<Video className="w-4 h-4" />} label="VİDEO OLUŞTURMA" />
         </div>
@@ -448,18 +497,51 @@ export default function StudioPage() {
                 </button>
               </div>
             )}
+
+            {activeTab === "gulser" && (
+              <div className="bg-[#0B0F1A] border border-slate-800/50 rounded-[2.5rem] p-8 space-y-8 shadow-2xl">
+                <div className="space-y-4">
+                  <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2"><Sun className="w-3 h-3 text-amber-500" /> Referans Hareket Seçimi</h3>
+                  <p className="text-xs text-slate-400">1. Görseldeki kumaş kıvrılma hareketini ve ışığı seçin.</p>
+                  <div className="grid grid-cols-3 gap-3">
+                    {GULSER_REFS.map((refImg, idx) => (
+                      <div 
+                        key={idx} 
+                        onClick={() => setSelectedGulserRef(idx)} 
+                        className={`aspect-square rounded-2xl overflow-hidden cursor-pointer border-2 transition-all ${selectedGulserRef === idx ? "border-amber-500 shadow-lg shadow-amber-500/20 scale-105" : "border-slate-800 hover:border-amber-500/50"}`}
+                      >
+                        <img src={refImg} className="w-full h-full object-cover" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2"><Upload className="w-3 h-3 text-amber-500" /> Kumaş Ekle (2. Görsel)</h3>
+                  <p className="text-xs text-slate-400">Dokusunu ve desenini koruyacağınız kumaşı yükleyin.</p>
+                  <div onClick={() => gulserFabricInputRef.current?.click()} className="h-40 rounded-3xl border-2 border-dashed border-slate-800 hover:border-amber-500/30 bg-[#060910] flex items-center justify-center cursor-pointer transition-all overflow-hidden relative group">
+                    {gulserFabricImage ? <img src={gulserFabricImage} className="w-full h-full object-contain p-2" /> : <div className="text-center opacity-30 group-hover:opacity-60"><Upload className="w-8 h-8 mx-auto mb-2" /><p className="text-[8px] font-black uppercase">Kumaş Yükle</p></div>}
+                    <input type="file" ref={gulserFabricInputRef} hidden accept="image/*" onChange={(e) => handleImageUpload(e.target.files?.[0], 'gulserFabric')} />
+                  </div>
+                </div>
+
+                <button onClick={handleGulserGenerate} disabled={isGulserLoading || !gulserFabricImage} className="w-full py-5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-[2.5rem] font-black text-xs tracking-widest uppercase flex items-center justify-center gap-3 shadow-xl transition-all disabled:opacity-20">
+                  {isGulserLoading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />} Dokuyu ve Hareketi Birleştir
+                </button>
+              </div>
+            )}
           </div>
 
           {/* RIGHT: RESULTS (8 cols) */}
           <div className="lg:col-span-8 flex flex-col gap-8 animate-in fade-in slide-in-from-right duration-1000">
-             {(activeTab === "generate" || activeTab === "edit") && (
+             {(activeTab === "generate" || activeTab === "edit" || activeTab === "gulser") && (
                 <div className="flex-1 bg-[#0B0F1A]/30 border border-slate-800/40 rounded-[3rem] p-10 backdrop-blur-sm relative overflow-hidden">
                    <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 blur-[120px] rounded-full pointer-events-none" />
                    
                    <div className="flex justify-between items-center mb-10 relative z-10">
                       <div className="space-y-1">
                         <h2 className="text-2xl font-black tracking-tighter uppercase leading-none">Çıktı Önizleme</h2>
-                        <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em]">{activeTab === "edit" ? "Düzenleme Modu" : (aspectRatio.name + " • " + resolution.label)}</p>
+                        <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em]">{activeTab === "edit" ? "Düzenleme Modu" : activeTab === "gulser" ? "Gülser Stüdyo Aktarımı" : (aspectRatio.name + " • " + resolution.label)}</p>
                       </div>
                       {generatedImages.some(img => img) && activeTab === "generate" && (
                          <button onClick={downloadAll} className="bg-slate-800/80 hover:bg-slate-700 text-white px-6 py-3 rounded-2xl flex items-center gap-3 font-black text-[10px] uppercase tracking-widest transition-all">
@@ -491,7 +573,7 @@ export default function StudioPage() {
                           </div>
                         ))}
                       </div>
-                   ) : (
+                   ) : activeTab === "edit" ? (
                       <div className="flex flex-col md:flex-row gap-8 h-full min-h-[400px]">
                         <div className="flex-1 space-y-3">
                            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Orijinal</p>
@@ -509,6 +591,34 @@ export default function StudioPage() {
                                 </div>
                               )}
                               {resultImage ? <img src={resultImage} className="w-full h-full object-contain p-2" /> : <div className="text-center opacity-[0.02]"><Sparkles className="w-32 h-32" /></div>}
+                           </div>
+                        </div>
+                      </div>
+                   ) : (
+                      <div className="flex flex-col md:flex-row gap-8 h-full min-h-[400px]">
+                        <div className="flex-1 space-y-3">
+                           <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Seçilen Referans</p>
+                           <div className="aspect-square bg-[#060910] rounded-3xl border border-slate-800/50 overflow-hidden flex items-center justify-center p-4">
+                              <img src={GULSER_REFS[selectedGulserRef]} className="w-full h-full object-contain" />
+                           </div>
+                        </div>
+                        <div className="flex-1 space-y-3">
+                           <p className="text-[9px] font-black text-amber-500 uppercase tracking-widest">Sonuç</p>
+                           <div className="aspect-square bg-[#060910] rounded-3xl border-2 border-dashed border-slate-800 flex items-center justify-center overflow-hidden relative group">
+                              {isGulserLoading && (
+                                <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center">
+                                   <RefreshCw className="w-10 h-10 text-amber-500 animate-spin" />
+                                   <p className="mt-4 text-[8px] font-black uppercase tracking-widest">Birleştiriliyor...</p>
+                                </div>
+                              )}
+                              {gulserResultImage ? (
+                                <>
+                                  <img src={gulserResultImage} className="w-full h-full object-contain p-2" />
+                                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-4 z-20">
+                                    <button onClick={() => setFullScreenImage({ index: 0, src: gulserResultImage })} className="bg-white/10 hover:bg-white/20 p-4 rounded-full backdrop-blur-md"><Maximize2 className="w-6 h-6 text-white" /></button>
+                                  </div>
+                                </>
+                              ) : <div className="text-center opacity-[0.02]"><Sparkles className="w-32 h-32" /></div>}
                            </div>
                         </div>
                       </div>
