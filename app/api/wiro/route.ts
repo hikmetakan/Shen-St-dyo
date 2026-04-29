@@ -78,9 +78,9 @@ export async function POST(request: Request) {
 
     // Prepare payload for Nano banana 2 on Wiro AI
     const payload = {
-        image_input: body.images,
+        inputImage: body.images,
         prompt: body.prompt || "Copy the fabric folding, movement, and lighting exactly from the first image and apply it to the fabric in the second image. Do not change the texture or color of the second fabric.",
-        aspect_ratio: "1:1",
+        aspectRatio: "1:1",
         resolution: body.resolution || "1K"
     };
 
@@ -114,7 +114,10 @@ export async function POST(request: Request) {
         });
 
         const status = detailRes.data?.data?.status || detailRes.data?.data?.state;
-        if (status === "end" || status === "success") {
+        const tasklist = detailRes.data?.data?.tasklist;
+        const isCompleted = status === "end" || status === "success" || (tasklist && tasklist.length > 0 && tasklist[0].pexit === "0");
+        
+        if (isCompleted) {
             let imageUrl = null;
             
             // Wiro API şeması bazen farklı olabiliyor, güvenli bir şekilde URL bulalım
