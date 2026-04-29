@@ -80,7 +80,7 @@ export async function POST(request: Request) {
     const payload = {
         inputImage: body.images,
         prompt: body.prompt || "Copy the fabric folding, movement, and lighting exactly from the first image and apply it to the fabric in the second image. Do not change the texture or color of the second fabric.",
-        aspectRatio: "1:1",
+        aspectRatio: body.aspectRatio || "1:1",
         resolution: body.resolution || "1K"
     };
 

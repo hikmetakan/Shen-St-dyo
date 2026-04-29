@@ -327,6 +327,7 @@ export default function StudioPage() {
         body: JSON.stringify({
           images: [gulserRefImage, gulserFabricImage],
           prompt: gulserPrompt,
+          aspectRatio: aspectRatio.value,
           resolution: resolution.value
         })
       });
@@ -337,7 +338,15 @@ export default function StudioPage() {
         // Wiro provides direct CDN URLs that don't expire and don't require CORS bypass for <img> tags.
         const finalUrl = data.data.imageUrl;
         setGulserResultImage(finalUrl);
-        if (data.data.totalCost !== undefined) setGulserCost(data.data.totalCost);
+        
+        let fetchedCost = data.data.totalCost;
+        if (!fetchedCost || fetchedCost === 0) {
+          if (resolution.value === '1K') fetchedCost = 0.067;
+          else if (resolution.value === '2K') fetchedCost = 0.101;
+          else if (resolution.value === '4K') fetchedCost = 0.151;
+        }
+        setGulserCost(fetchedCost);
+        
         await saveToDB({ id: Date.now(), image: finalUrl, prompt: "Gülser Kumaş Hareketi Aktarımı", type: "gulser" });
         fetchHistory();
         fetchCredits();
@@ -525,11 +534,26 @@ export default function StudioPage() {
                   <textarea value={gulserPrompt} onChange={(e) => setGulserPrompt(e.target.value)} placeholder="Modelin ne yapmasını istediğinizi yazın..." className="w-full h-24 p-5 rounded-[2rem] bg-[#060910] border border-slate-800 focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all outline-none text-sm font-medium leading-relaxed" />
                 </div>
 
-                <div className="space-y-3">
-                  <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1"><Monitor className="w-2.5 h-2.5" /> Çözünürlük</label>
-                  <select value={resolution.value} onChange={(e) => setResolution(RESOLUTIONS.find(r => r.value === e.target.value) || RESOLUTIONS[0])} className="w-full bg-[#060910] border border-slate-800 p-3 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none">
-                    {RESOLUTIONS.map(r => <option key={r.value} value={r.value}>{r.label} ({r.desc})</option>)}
-                  </select>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-3">
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1"><Monitor className="w-2.5 h-2.5" /> Görsel Oranı</label>
+                    <select value={aspectRatio.value} onChange={(e) => setAspectRatio(ASPECT_RATIOS.find(r => r.value === e.target.value) || ASPECT_RATIOS[2])} className="w-full bg-[#060910] border border-slate-800 p-3 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none">
+                      {ASPECT_RATIOS.map(r => <option key={r.value} value={r.value}>{r.name}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1"><Monitor className="w-2.5 h-2.5" /> Çözünürlük</label>
+                    <select value={resolution.value} onChange={(e) => setResolution(RESOLUTIONS.find(r => r.value === e.target.value) || RESOLUTIONS[0])} className="w-full bg-[#060910] border border-slate-800 p-3 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none">
+                      {RESOLUTIONS.map(r => {
+                        let costStr = r.desc;
+                        if (r.value === '1K') costStr = '$0.067';
+                        else if (r.value === '2K') costStr = '$0.101';
+                        else if (r.value === '4K') costStr = '$0.151';
+                        return <option key={r.value} value={r.value}>{r.label} ({costStr})</option>
+                      })}
+                    </select>
+                  </div>
                 </div>
 
                 <button onClick={handleGulserGenerate} disabled={isGulserLoading || !gulserRefImage || !gulserFabricImage} className="w-full py-5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-[2.5rem] font-black text-xs tracking-widest uppercase flex items-center justify-center gap-3 shadow-xl transition-all disabled:opacity-20">
