@@ -176,6 +176,7 @@ export default function StudioPage() {
   const [gulserPrompt, setGulserPrompt] = useState("1. Referans görseldeki kumaşın kıvrımlarını, hareketini ve ışığını al; bunları 2. görsele uygula. 2. Görseldeki kumaşın desenini ve dokusunu KESİNLİKLE BOZMA.");
   const [isGulserLoading, setIsGulserLoading] = useState(false);
   const [gulserResultImage, setGulserResultImage] = useState<string | null>(null);
+  const [gulserCost, setGulserCost] = useState<number | null>(null);
 
   const [generatedImages, setGeneratedImages] = useState<(string | null)[]>(Array(4).fill(null));
   const [loadingStates, setLoadingStates] = useState<boolean[]>(Array(4).fill(false));
@@ -318,6 +319,7 @@ export default function StudioPage() {
     if (!gulserRefImage || !gulserFabricImage) return;
     setIsGulserLoading(true);
     setGulserResultImage(null);
+    setGulserCost(null);
     try {
       const res = await fetch("/api/wiro", {
         method: "POST",
@@ -336,6 +338,7 @@ export default function StudioPage() {
         const proxyData = await imgRes.json();
         if (proxyData.base64) {
           setGulserResultImage(proxyData.base64);
+          if (data.data.totalCost !== undefined) setGulserCost(data.data.totalCost);
           await saveToDB({ id: Date.now(), image: proxyData.base64, prompt: "Gülser Kumaş Hareketi Aktarımı", type: "gulser" });
           fetchHistory();
           fetchCredits();
@@ -626,6 +629,11 @@ export default function StudioPage() {
                           </>
                         ) : <div className="text-center opacity-[0.02]"><Sparkles className="w-32 h-32" /></div>}
                       </div>
+                      {gulserCost !== null && (
+                        <p className="text-[10px] font-black text-amber-500 text-center uppercase tracking-widest mt-2">
+                          Maliyet: ${gulserCost}
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}

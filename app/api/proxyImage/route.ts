@@ -19,7 +19,8 @@ export async function GET(request: Request) {
 
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    const base64 = buffer.toString('base64');
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    const base64 = `data:${contentType};base64,${buffer.toString('base64')}`;
 
     return NextResponse.json({ base64 });
   } catch (error: any) {

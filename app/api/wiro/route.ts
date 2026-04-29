@@ -160,7 +160,8 @@ export async function POST(request: Request) {
             }
 
             if (imageUrl) {
-                return NextResponse.json({ code: 200, data: { imageUrl } });
+                const totalCost = detailRes.data?.data?.totalcost || 0;
+                return NextResponse.json({ code: 200, data: { imageUrl, totalCost } });
             }
         }
         if (status === "fail" || status === "error") {
