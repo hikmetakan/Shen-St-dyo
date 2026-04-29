@@ -84,7 +84,7 @@ export async function POST(request: Request) {
         resolution: "1K"
     };
 
-    const runRes = await axios.post(`${WIRO_BASE_URL}/Run/wiro/nano-banana-2`, payload, {
+    const runRes = await axios.post(`${WIRO_BASE_URL}/Run/google/nano-banana-2`, payload, {
         headers: {
             "x-api-key": WIRO_API_KEY,
             "Content-Type": "application/json"
