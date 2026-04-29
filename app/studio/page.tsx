@@ -502,18 +502,11 @@ export default function StudioPage() {
             {activeTab === "gulser" && (
               <div className="bg-[#0B0F1A] border border-slate-800/50 rounded-[2.5rem] p-8 space-y-8 shadow-2xl">
                 <div className="space-y-4">
-                  <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2"><Sun className="w-3 h-3 text-amber-500" /> Referans Hareket Seçimi</h3>
+                  <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2"><Upload className="w-3 h-3 text-amber-500" /> Referans Ekle (1. Görsel)</h3>
                   <p className="text-xs text-slate-400">1. Görseldeki kumaş kıvrılma hareketini ve ışığı seçin.</p>
-                  <div className="grid grid-cols-3 gap-3">
-                    {GULSER_REFS.map((refImg, idx) => (
-                      <div
-                        key={idx}
-                        onClick={() => setSelectedGulserRef(idx)}
-                        className={`aspect-square rounded-2xl overflow-hidden cursor-pointer border-2 transition-all ${selectedGulserRef === idx ? "border-amber-500 shadow-lg shadow-amber-500/20 scale-105" : "border-slate-800 hover:border-amber-500/50"}`}
-                      >
-                        <img src={refImg} className="w-full h-full object-cover" />
-                      </div>
-                    ))}
+                  <div onClick={() => gulserRefInputRef.current?.click()} className="h-40 rounded-3xl border-2 border-dashed border-slate-800 hover:border-amber-500/30 bg-[#060910] flex items-center justify-center cursor-pointer transition-all overflow-hidden relative group">
+                    {gulserRefImage ? <img src={gulserRefImage} className="w-full h-full object-contain p-2" /> : <div className="text-center opacity-30 group-hover:opacity-60"><Upload className="w-8 h-8 mx-auto mb-2" /><p className="text-[8px] font-black uppercase">Referans Yükle</p></div>}
+                    <input type="file" ref={gulserRefInputRef} hidden accept="image/*" onChange={(e) => handleImageUpload(e.target.files?.[0], 'gulserRef')} />
                   </div>
                 </div>
 
