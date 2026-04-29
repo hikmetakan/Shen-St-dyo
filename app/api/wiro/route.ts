@@ -113,15 +113,16 @@ export async function POST(request: Request) {
             }
         });
 
-        const status = detailRes.data?.data?.status || detailRes.data?.data?.state;
-        const tasklist = detailRes.data?.data?.tasklist;
+        const payloadData = detailRes.data?.data || detailRes.data;
+        const status = payloadData?.status || payloadData?.state;
+        const tasklist = payloadData?.tasklist;
         const isCompleted = 
             status === "end" || 
             status === "success" || 
             status === "task_postprocess_end" || 
             status === "agent_end" || 
-            detailRes.data?.data?.pexit === 0 || 
-            detailRes.data?.data?.pexit === "0" || 
+            payloadData?.pexit === 0 || 
+            payloadData?.pexit === "0" || 
             (tasklist && tasklist.length > 0 && (tasklist[0].pexit === "0" || tasklist[0].pexit === 0));
         
         if (isCompleted) {
@@ -151,16 +152,16 @@ export async function POST(request: Request) {
                 return null;
             };
 
-            const outputs = detailRes.data?.data?.outputs || detailRes.data?.data?.results || detailRes.data?.data?.tasklist;
-            imageUrl = findUrl(outputs) || findUrl(detailRes.data?.data);
+            const outputs = payloadData?.outputs || payloadData?.results || payloadData?.tasklist;
+            imageUrl = findUrl(outputs) || findUrl(payloadData);
 
-            if (detailRes.data?.data?.debugoutput && !imageUrl) {
-                const match = detailRes.data.data.debugoutput.match(/https?:\/\/[^\s"'\]]+/);
+            if (payloadData?.debugoutput && !imageUrl) {
+                const match = payloadData.debugoutput.match(/https?:\/\/[^\s"'\]]+/);
                 if (match) imageUrl = match[0];
             }
 
             if (imageUrl) {
-                const totalCost = detailRes.data?.data?.totalcost || 0;
+                const totalCost = payloadData?.totalcost || 0;
                 return NextResponse.json({ code: 200, data: { imageUrl, totalCost } });
             }
         }
