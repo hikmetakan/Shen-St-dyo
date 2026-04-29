@@ -178,6 +178,7 @@ export default function StudioPage() {
   ];
   const [selectedGulserRef, setSelectedGulserRef] = useState<number>(0);
   const [gulserFabricImage, setGulserFabricImage] = useState<string | null>(null);
+  const [gulserPrompt, setGulserPrompt] = useState("Kumaşın rengini ve desenini BİREBİR KORU. Referans görseldeki kumaşın YALNIZCA ışığını, kıvrımlarını ve dalgalanmasını bu kumaşa uygula. Doku kaybı olmasın.");
   const [isGulserLoading, setIsGulserLoading] = useState(false);
   const [gulserResultImage, setGulserResultImage] = useState<string | null>(null);
 
@@ -324,7 +325,9 @@ export default function StudioPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          images: [GULSER_REFS[selectedGulserRef], gulserFabricImage]
+          images: [GULSER_REFS[selectedGulserRef], gulserFabricImage],
+          prompt: gulserPrompt,
+          resolution: resolution.value
         })
       });
       const data = await res.json();
@@ -523,6 +526,18 @@ export default function StudioPage() {
                     {gulserFabricImage ? <img src={gulserFabricImage} className="w-full h-full object-contain p-2" /> : <div className="text-center opacity-30 group-hover:opacity-60"><Upload className="w-8 h-8 mx-auto mb-2" /><p className="text-[8px] font-black uppercase">Kumaş Yükle</p></div>}
                     <input type="file" ref={gulserFabricInputRef} hidden accept="image/*" onChange={(e) => handleImageUpload(e.target.files?.[0], 'gulserFabric')} />
                   </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2"><Sparkles className="w-3 h-3 text-amber-500" /> Detaylı Yönlendirme (Prompt)</h3>
+                  <textarea value={gulserPrompt} onChange={(e) => setGulserPrompt(e.target.value)} placeholder="Modelin ne yapmasını istediğinizi yazın..." className="w-full h-24 p-5 rounded-[2rem] bg-[#060910] border border-slate-800 focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all outline-none text-sm font-medium leading-relaxed" />
+                </div>
+
+                <div className="space-y-3">
+                  <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1"><Monitor className="w-2.5 h-2.5" /> Çözünürlük</label>
+                  <select value={resolution.value} onChange={(e) => setResolution(RESOLUTIONS.find(r => r.value === e.target.value) || RESOLUTIONS[0])} className="w-full bg-[#060910] border border-slate-800 p-3 rounded-xl text-[10px] font-black uppercase tracking-widest outline-none">
+                    {RESOLUTIONS.map(r => <option key={r.value} value={r.value}>{r.label} ({r.desc})</option>)}
+                  </select>
                 </div>
 
                 <button onClick={handleGulserGenerate} disabled={isGulserLoading || !gulserFabricImage} className="w-full py-5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-[2.5rem] font-black text-xs tracking-widest uppercase flex items-center justify-center gap-3 shadow-xl transition-all disabled:opacity-20">

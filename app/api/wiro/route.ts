@@ -81,7 +81,7 @@ export async function POST(request: Request) {
         image_input: body.images,
         prompt: body.prompt || "Copy the fabric folding, movement, and lighting exactly from the first image and apply it to the fabric in the second image. Do not change the texture or color of the second fabric.",
         aspect_ratio: "1:1",
-        resolution: "1K"
+        resolution: body.resolution || "1K"
     };
 
     const runRes = await axios.post(`${WIRO_BASE_URL}/Run/google/nano-banana-2`, payload, {
@@ -113,22 +113,43 @@ export async function POST(request: Request) {
             }
         });
 
-        const status = detailRes.data?.data?.status;
+        const status = detailRes.data?.data?.status || detailRes.data?.data?.state;
         if (status === "end" || status === "success") {
-            const outputs = detailRes.data.data.outputs;
             let imageUrl = null;
-            if (outputs && outputs.length > 0) {
-                imageUrl = outputs[0].url || outputs[0].value;
-            } else if (detailRes.data.data.results && detailRes.data.data.results.length > 0) {
-                imageUrl = detailRes.data.data.results[0].url;
-            } else if (detailRes.data.data.debugoutput) {
-                const debugStr = detailRes.data.data.debugoutput;
-                const match = debugStr.match(/https?:\/\/[^\s"'\]]+/);
+            
+            // Wiro API şeması bazen farklı olabiliyor, güvenli bir şekilde URL bulalım
+            const findUrl = (obj: any): string | null => {
+                if (typeof obj === 'string') {
+                    if (obj.startsWith('http') && (obj.includes('wiro.ai') || obj.includes('.png') || obj.includes('.jpg') || obj.includes('.webp'))) {
+                        return obj;
+                    }
+                } else if (Array.isArray(obj)) {
+                    for (let item of obj) {
+                        const res = findUrl(item);
+                        if (res) return res;
+                    }
+                } else if (obj !== null && typeof obj === 'object') {
+                    // check specific keys first to prioritize actual outputs
+                    if (obj.url && typeof obj.url === 'string') return obj.url;
+                    if (obj.value && typeof obj.value === 'string' && obj.value.startsWith('http')) return obj.value;
+                    
+                    for (let key of Object.keys(obj)) {
+                        const res = findUrl(obj[key]);
+                        if (res) return res;
+                    }
+                }
+                return null;
+            };
+
+            const outputs = detailRes.data?.data?.outputs || detailRes.data?.data?.results || detailRes.data?.data?.tasklist;
+            imageUrl = findUrl(outputs) || findUrl(detailRes.data?.data);
+
+            if (detailRes.data?.data?.debugoutput && !imageUrl) {
+                const match = detailRes.data.data.debugoutput.match(/https?:\/\/[^\s"'\]]+/);
                 if (match) imageUrl = match[0];
             }
 
             if (imageUrl) {
-                // Return via proxyImage endpoint to bypass CORS if needed
                 return NextResponse.json({ code: 200, data: { imageUrl } });
             }
         }
