@@ -92,7 +92,12 @@ export async function POST(request: Request) {
     });
 
     if (!runRes.data.result) {
-        return NextResponse.json({ code: 500, msg: runRes.data.errors?.[0] || "Wiro AI Görevi başlatılamadı." }, { status: 500 });
+        let errMsg = "Wiro AI Görevi başlatılamadı.";
+        if (runRes.data.errors && runRes.data.errors.length > 0) {
+            const errObj = runRes.data.errors[0];
+            errMsg = typeof errObj === 'string' ? errObj : JSON.stringify(errObj);
+        }
+        return NextResponse.json({ code: 500, msg: errMsg }, { status: 500 });
     }
 
     const taskId = runRes.data.taskid;
@@ -128,7 +133,9 @@ export async function POST(request: Request) {
             }
         }
         if (status === "fail" || status === "error") {
-            return NextResponse.json({ code: 500, msg: detailRes.data?.data?.error || "Wiro AI Görevi başarısız oldu." }, { status: 500 });
+            let detailErr = detailRes.data?.data?.error || "Wiro AI Görevi başarısız oldu.";
+            detailErr = typeof detailErr === 'string' ? detailErr : JSON.stringify(detailErr);
+            return NextResponse.json({ code: 500, msg: detailErr }, { status: 500 });
         }
     }
 
@@ -136,8 +143,23 @@ export async function POST(request: Request) {
 
   } catch (error: any) {
     console.error("Wiro AI Error:", error.response?.data || error.message);
+    
+    let errMsg = "Sunucu hatası.";
+    if (error.response?.data) {
+        const responseData = error.response.data;
+        if (responseData.errors && responseData.errors.length > 0) {
+            errMsg = typeof responseData.errors[0] === 'string' ? responseData.errors[0] : JSON.stringify(responseData.errors[0]);
+        } else if (responseData.message) {
+            errMsg = responseData.message;
+        } else {
+            errMsg = typeof responseData === 'string' ? responseData : JSON.stringify(responseData);
+        }
+    } else if (error.message) {
+        errMsg = error.message;
+    }
+
     return NextResponse.json(
-      { code: 500, msg: error.response?.data?.errors?.[0] || "Sunucu hatası." },
+      { code: 500, msg: errMsg },
       { status: 500 }
     );
   }
