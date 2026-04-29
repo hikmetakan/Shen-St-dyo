@@ -115,7 +115,14 @@ export async function POST(request: Request) {
 
         const status = detailRes.data?.data?.status || detailRes.data?.data?.state;
         const tasklist = detailRes.data?.data?.tasklist;
-        const isCompleted = status === "end" || status === "success" || (tasklist && tasklist.length > 0 && tasklist[0].pexit === "0");
+        const isCompleted = 
+            status === "end" || 
+            status === "success" || 
+            status === "task_postprocess_end" || 
+            status === "agent_end" || 
+            detailRes.data?.data?.pexit === 0 || 
+            detailRes.data?.data?.pexit === "0" || 
+            (tasklist && tasklist.length > 0 && (tasklist[0].pexit === "0" || tasklist[0].pexit === 0));
         
         if (isCompleted) {
             let imageUrl = null;
