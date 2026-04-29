@@ -333,16 +333,14 @@ export default function StudioPage() {
       const data = await res.json();
 
       if (data.code === 200 && data.data?.imageUrl) {
-        // Wiro'dan gelen görseli CORS proxy üzerinden alıp gösteriyoruz
-        const imgRes = await fetch(`/api/proxyImage?url=${encodeURIComponent(data.data.imageUrl)}`);
-        const proxyData = await imgRes.json();
-        if (proxyData.base64) {
-          setGulserResultImage(proxyData.base64);
-          if (data.data.totalCost !== undefined) setGulserCost(data.data.totalCost);
-          await saveToDB({ id: Date.now(), image: proxyData.base64, prompt: "Gülser Kumaş Hareketi Aktarımı", type: "gulser" });
-          fetchHistory();
-          fetchCredits();
-        }
+        // Vercel serverless function payload limit (4.5MB) is exceeded for 2K/4K images when using base64.
+        // Wiro provides direct CDN URLs that don't expire and don't require CORS bypass for <img> tags.
+        const finalUrl = data.data.imageUrl;
+        setGulserResultImage(finalUrl);
+        if (data.data.totalCost !== undefined) setGulserCost(data.data.totalCost);
+        await saveToDB({ id: Date.now(), image: finalUrl, prompt: "Gülser Kumaş Hareketi Aktarımı", type: "gulser" });
+        fetchHistory();
+        fetchCredits();
       } else {
         alert("Wiro API Hatası: " + (data.msg || "Bilinmeyen hata"));
       }
