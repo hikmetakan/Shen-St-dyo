@@ -171,14 +171,9 @@ export default function StudioPage() {
   const [resultImage, setResultImage] = useState<string | null>(null);
 
   // --- GULSER STUDYO STATES ---
-  const GULSER_REFS = [
-    "https://lh3.googleusercontent.com/pw/AP1GczMiGwEt2HvZAk7E9n2hbdW0Ow3Kx6mO7v_j-WDirWPRCqNglB-B2ifMnD7fpu0-qja12486F9-Dp2RQQ09dTVnnIAOO2IgWnOJp6SZqmbdaIpS2jmJS0lvZIaphGWP-MwTlYs6Z3sqBbTyLJjZJNBMK=w735-h869-s-no?authuser=0",
-    "https://lh3.googleusercontent.com/pw/AP1GczMiGwEt2HvZAk7E9n2hbdW0Ow3Kx6mO7v_j-WDirWPRCqNglB-B2ifMnD7fpu0-qja12486F9-Dp2RQQ09dTVnnIAOO2IgWnOJp6SZqmbdaIpS2jmJS0lvZIaphGWP-MwTlYs6Z3sqBbTyLJjZJNBMK=w735-h869-s-no?authuser=0",
-    "https://lh3.googleusercontent.com/pw/AP1GczMiGwEt2HvZAk7E9n2hbdW0Ow3Kx6mO7v_j-WDirWPRCqNglB-B2ifMnD7fpu0-qja12486F9-Dp2RQQ09dTVnnIAOO2IgWnOJp6SZqmbdaIpS2jmJS0lvZIaphGWP-MwTlYs6Z3sqBbTyLJjZJNBMK=w735-h869-s-no?authuser=0"
-  ];
-  const [selectedGulserRef, setSelectedGulserRef] = useState<number>(0);
+  const [gulserRefImage, setGulserRefImage] = useState<string | null>(null);
   const [gulserFabricImage, setGulserFabricImage] = useState<string | null>(null);
-  const [gulserPrompt, setGulserPrompt] = useState("Kumaşın rengini ve desenini BİREBİR KORU. Referans görseldeki kumaşın YALNIZCA ışığını, kıvrımlarını ve dalgalanmasını bu kumaşa uygula. Doku kaybı olmasın.");
+  const [gulserPrompt, setGulserPrompt] = useState("1. Referans görseldeki kumaşın kıvrımlarını, hareketini ve ışığını al; bunları 2. görsele uygula. 2. Görseldeki kumaşın desenini ve dokusunu KESİNLİKLE BOZMA.");
   const [isGulserLoading, setIsGulserLoading] = useState(false);
   const [gulserResultImage, setGulserResultImage] = useState<string | null>(null);
 
@@ -192,6 +187,7 @@ export default function StudioPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editMainInputRef = useRef<HTMLInputElement>(null);
   const editRefInputRef = useRef<HTMLInputElement>(null);
+  const gulserRefInputRef = useRef<HTMLInputElement>(null);
   const gulserFabricInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -220,7 +216,7 @@ export default function StudioPage() {
     setHistory(validItems);
   };
 
-  const handleImageUpload = async (file: File | undefined, target: 'main' | 'editMain' | 'editRef' | 'gulserFabric') => {
+  const handleImageUpload = async (file: File | undefined, target: 'main' | 'editMain' | 'editRef' | 'gulserFabric' | 'gulserRef') => {
     if (!file) return;
 
     let base64;
@@ -243,6 +239,8 @@ export default function StudioPage() {
       setEditRefImage(base64);
     } else if (target === 'gulserFabric') {
       setGulserFabricImage(base64);
+    } else if (target === 'gulserRef') {
+      setGulserRefImage(base64);
     }
   };
 
@@ -317,7 +315,7 @@ export default function StudioPage() {
   };
 
   const handleGulserGenerate = async () => {
-    if (!gulserFabricImage) return;
+    if (!gulserRefImage || !gulserFabricImage) return;
     setIsGulserLoading(true);
     setGulserResultImage(null);
     try {
@@ -325,7 +323,7 @@ export default function StudioPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          images: [GULSER_REFS[selectedGulserRef], gulserFabricImage],
+          images: [gulserRefImage, gulserFabricImage],
           prompt: gulserPrompt,
           resolution: resolution.value
         })
@@ -540,7 +538,7 @@ export default function StudioPage() {
                   </select>
                 </div>
 
-                <button onClick={handleGulserGenerate} disabled={isGulserLoading || !gulserFabricImage} className="w-full py-5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-[2.5rem] font-black text-xs tracking-widest uppercase flex items-center justify-center gap-3 shadow-xl transition-all disabled:opacity-20">
+                <button onClick={handleGulserGenerate} disabled={isGulserLoading || !gulserRefImage || !gulserFabricImage} className="w-full py-5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-[2.5rem] font-black text-xs tracking-widest uppercase flex items-center justify-center gap-3 shadow-xl transition-all disabled:opacity-20">
                   {isGulserLoading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />} Dokuyu ve Hareketi Birleştir
                 </button>
               </div>
@@ -612,9 +610,9 @@ export default function StudioPage() {
                 ) : (
                   <div className="flex flex-col md:flex-row gap-8 h-full min-h-[400px]">
                     <div className="flex-1 space-y-3">
-                      <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Seçilen Referans</p>
+                      <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">1. Referans</p>
                       <div className="aspect-square bg-[#060910] rounded-3xl border border-slate-800/50 overflow-hidden flex items-center justify-center p-4">
-                        <img src={GULSER_REFS[selectedGulserRef]} className="w-full h-full object-contain" />
+                        {gulserRefImage ? <img src={gulserRefImage} className="w-full h-full object-contain" /> : <ImageIcon className="w-12 h-12 text-slate-800" />}
                       </div>
                     </div>
                     <div className="flex-1 space-y-3">

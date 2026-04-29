@@ -169,7 +169,13 @@ export async function POST(request: Request) {
     console.error("Wiro AI Error:", error.response?.data || error.message);
     
     let errMsg = "Sunucu hatası.";
-    if (error.response?.data) {
+    if (error.response?.status === 401) {
+        errMsg = "Wiro AI Yetkisiz erişim. API anahtarınız (WIRO_API_KEY) hatalı veya eksik.";
+    } else if (error.response?.status === 403) {
+        errMsg = "Wiro AI Erişim reddedildi. Bu modeli kullanma yetkiniz yok veya anahtar geçersiz.";
+    } else if (error.response?.status === 429) {
+        errMsg = "Wiro AI Rate limit aşıldı. Lütfen biraz bekleyip tekrar deneyin.";
+    } else if (error.response?.data) {
         const responseData = error.response.data;
         if (responseData.errors && responseData.errors.length > 0) {
             errMsg = typeof responseData.errors[0] === 'string' ? responseData.errors[0] : JSON.stringify(responseData.errors[0]);
